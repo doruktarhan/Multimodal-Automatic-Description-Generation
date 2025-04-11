@@ -1,8 +1,8 @@
 import torch
 import os
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, TaskType
-from typing import Dict, Any, Optional
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, TaskType, PeftModel
+from typing import Dict, Any, Optional, Tuple
 
 def load_tokenizer(model_name: str) -> AutoTokenizer:
     """
@@ -144,6 +144,45 @@ def load_model(
         model.print_trainable_parameters()
     
     return model
+
+def load_trained_model(
+        base_model_name:str,
+        trained_model_path: Optional[str] = None,
+        quantization_bits:int = 4,
+        device_map:str = "auto",
+        )-> Tuple[torch.nn.Module,AutoTokenizer]:
+    
+    base_model = load_model(
+        base_model_name,
+        use_lora= False,
+        quantization_bits=quantization_bits,
+        device_map=device_map
+        )
+    
+    tokenizer = load_tokenizer(base_model_name)
+
+    if trained_model_path is not None:
+        # Load the trained model
+        print(f"Loading trained model from {trained_model_path}...")
+        trained_model = PeftModel.from_pretrained(
+            base_model,
+            trained_model_path,
+            device_map=device_map,
+            torch_dtype=torch.float16
+        )
+        print(f"Trained model loaded from {trained_model_path}")
+    else: 
+        trained_model = base_model
+        # Load the base model without LoRA
+        print(f"Base model loaded from {base_model_name}")
+    
+        # Enable KV caching for faster inference
+    if hasattr(trained_model, "config"):
+        trained_model.config.use_cache = True
+    
+    return trained_model, tokenizer
+
+    
 
 def save_model(model, output_dir: str):
     """
