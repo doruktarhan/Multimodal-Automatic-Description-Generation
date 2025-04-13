@@ -116,21 +116,20 @@ def main():
     print(f"Using model: {model_name} ({selected_model})")
 
 
-    data_path = "Data/train_data.json"
+    data_path = "Data/Dummy/dummy_train_data.json"
    
 
 
     # Training hyperparams - testing all 30 samples
-    stream_chunk_size = 1024     # Load 10 samples at a time
-    micro_batch_size = 8      # Train one sample at a time
-    epochs = 3                 # Number of epochs
-    max_sequence_length = 2000  # Moderate sequence length
+    stream_chunk_size = 16     # Load 10 samples at a time
+    micro_batch_size = 2      # Train one sample at a time
+    epochs = 1                   # Number of epochs
+    max_sequence_length = 8192  # Moderate sequence length
     learning_rate = 5e-5       # Conservative learning rate
     quantization = 8            #select from [0,4,8] 0 for no quantization
-    gradient_accumulation_steps = 8 # update parameters after every x steps for making effective learning rate desired 
+    gradient_accumulation_steps = 4 # update parameters after every x steps for making effective learning rate desired 
     chunk_repeat_eval_save = 100000 #save model after each x chunk, large number indicates no saving during training. 
-
-
+    
     # For GPU, explicitly set device_map to "auto" which should use all available GPUs
     device_map = "auto"
     
@@ -300,6 +299,31 @@ def main():
 
     ############### Validation Data Creation #########################
 
+    val_raw_data = []
+    try:
+        val_data_loader = CustomDataLoader(val_data_path)
+        # Load validation data
+        for batch in val_data_loader.stream_data(batch_size=100):
+            val_raw_data.extend(batch)
+
+        val_processed = preprocessor.process_data(val_raw_data)
+        print(f"Preprocessed {len(val_processed)} validation examples")
+        val_dataset = RealEstateDataset.from_preprocessor(
+            raw_data=val_raw_data,
+            preprocessor=preprocessor,
+            tokenizer=tokenizer,
+            max_input_length=max_sequence_length,
+            max_output_length=max_sequence_length
+        )
+        print(f"Created validation dataset with {len(val_dataset)} examples")
+
+        #track best metrics for validation
+        best_metrics = {'perplexity': float('inf'), 'bleu_4': 0, 'rougeL': 0}
+        best_model_path = os.path.join(output_dir, "best_model")
+        
+    except: 
+        print(f"No validation data exists")
+
     ############################# Training loop ###################################
 
     # Train for the specified number of epochs
@@ -442,10 +466,118 @@ def main():
                 except Exception as e:
                     print(f"Failed to save checkpoint: {e}")
             
+            # evaluate the checkpointed model if validation data exists
+            if chunk_count % chunk_repeat_eval_save == 0 and val_raw_data is not None:
+                print(f"Evaluating model on validation set for  epoch {epoch+1} chunk {chunk_count}/{total_chunks}")
+                metrics,examples = evaluate_model(
+                    model=model,
+                    val_dataset=val_dataset,
+                    tokenizer=tokenizer,
+                    model_device=model_device,
+                    batch_size=micro_batch_size,
+                    max_gen_length=max_new_tokens,
+                    num_samples=num_samples,  # Evaluate all samples
+                    collate_fn=collate_fn
+                )
+                wandb.log({
+                    "val_perplexity": metrics['perplexity'],
+                    "val_bleu_1": metrics['bleu_1'],
+                    "val_bleu_4": metrics['bleu_4'],
+                    "val_meteor": metrics['meteor'],
+                    "val_rouge1": metrics['rouge1'],
+                    "val_rouge2": metrics['rouge2'],
+                    "val_rougeL": metrics['rougeL'],
+                    "epoch": epoch,
+                    "chunk": chunk_count,
+                    "global_step": epoch_batches
+                })
+                        # Check if this is the best model so far
+                is_best = False
+                if metrics['perplexity'] < best_metrics['perplexity']:
+                    best_metrics['perplexity'] = metrics['perplexity']
+                    is_best = True
+                    
+                if metrics['bleu_4'] > best_metrics['bleu_4']:
+                    best_metrics['bleu_4'] = metrics['bleu_4']
+                    is_best = True
+                    
+                if metrics['rougeL'] > best_metrics['rougeL']:
+                    best_metrics['rougeL'] = metrics['rougeL']
+                    is_best = True
+
+                # Save the best model
+                if is_best:
+                    try:
+                        print(f"New best model! Saving to {best_model_path}")
+                        save_model(model, best_model_path)
+                        
+                        # Save the metrics alongside the model
+                        with open(os.path.join(best_model_path, "metrics.txt"), "w") as f:
+                            for k, v in metrics.items():
+                                f.write(f"{k}: {v:.4f}\n")
+                    except Exception as e:
+                        print(f"Failed to save best model: {e}")
+
+
         # Handle any remaining gradients at the end of all chunks
         if epoch_batches % gradient_accumulation_steps != 0:
             optimizer.step()
             optimizer.zero_grad()
+
+
+        ###################### Evaluation Step After Epoch #################################
+        # Evaluate model on validation set (if available)
+        # evaluate the checkpointed model if validation data exists
+        if chunk_count % chunk_repeat_eval_save == 0 and val_raw_data is not None:
+            print(f"Evaluating model on validation set for  epoch {epoch+1} chunk {chunk_count}/{total_chunks}")
+            metrics,examples = evaluate_model(
+                model=model,
+                val_dataset=val_dataset,
+                tokenizer=tokenizer,
+                model_device=model_device,
+                batch_size=eval_batch_size,
+                max_gen_length=max_new_tokens,
+                num_samples=num_samples,  # Evaluate all samples
+                collate_fn=collate_fn
+            )
+            wandb.log({
+                "val_perplexity": metrics['perplexity'],
+                "val_bleu_1": metrics['bleu_1'],
+                "val_bleu_4": metrics['bleu_4'],
+                "val_meteor": metrics['meteor'],
+                "val_rouge1": metrics['rouge1'],
+                "val_rouge2": metrics['rouge2'],
+                "val_rougeL": metrics['rougeL'],
+                "epoch": epoch,
+                "chunk": chunk_count,
+                "global_step": epoch_batches
+            })
+                    # Check if this is the best model so far
+            is_best = False
+            if metrics['perplexity'] < best_metrics['perplexity']:
+                best_metrics['perplexity'] = metrics['perplexity']
+                is_best = True
+                
+            if metrics['bleu_4'] > best_metrics['bleu_4']:
+                best_metrics['bleu_4'] = metrics['bleu_4']
+                is_best = True
+                
+            if metrics['rougeL'] > best_metrics['rougeL']:
+                best_metrics['rougeL'] = metrics['rougeL']
+                is_best = True
+
+            # Save the best model
+            if is_best:
+                try:
+                    print(f"New best model! Saving to {best_model_path}")
+                    save_model(model, best_model_path)
+                    
+                    # Save the metrics alongside the model
+                    with open(os.path.join(best_model_path, "metrics.txt"), "w") as f:
+                        for k, v in metrics.items():
+                            f.write(f"{k}: {v:.4f}\n")
+                except Exception as e:
+                    print(f"Failed to save best model: {e}")
 
             
         # Report epoch stats

@@ -91,7 +91,7 @@ def load_model(
     model_name: str,
     use_lora: bool = True,
     lora_config: Optional[LoraConfig] = None,
-    quantization_bits: int = 4,
+    quantization_bits: int = 8,
     device_map: str = "auto"
 ) -> torch.nn.Module:
     """
@@ -148,7 +148,7 @@ def load_model(
 def load_trained_model(
         base_model_name:str,
         trained_model_path: Optional[str] = None,
-        quantization_bits:int = 4,
+        quantization_bits:int = 8,
         device_map:str = "auto",
         )-> Tuple[torch.nn.Module,AutoTokenizer]:
     
@@ -168,7 +168,8 @@ def load_trained_model(
             base_model,
             trained_model_path,
             device_map=device_map,
-            torch_dtype=torch.float16
+            torch_dtype=torch.float16,
+            local_files_only = True #ensures to look for local files
         )
         print(f"Trained model loaded from {trained_model_path}")
     else: 
@@ -182,7 +183,115 @@ def load_trained_model(
     
     return trained_model, tokenizer
 
+# def load_trained_model(
+#         base_model_name: str,
+#         trained_model_path: Optional[str] = None,
+#         quantization_bits: int = 4,
+#         device_map: str = "auto",
+#         ) -> Tuple[torch.nn.Module, AutoTokenizer]:
+#     """
+#     Load a base model and optionally apply LoRA weights
     
+#     Args:
+#         base_model_name: Name or path of the base model
+#         trained_model_path: Path to trained LoRA weights (can be local or HF Hub)
+#         quantization_bits: Quantization bits (0, 4, or 8)
+#         device_map: Device mapping strategy
+        
+#     Returns:
+#         Tuple of (model, tokenizer)
+#     """
+#     base_model = load_model(
+#         base_model_name,
+#         use_lora=False,
+#         quantization_bits=quantization_bits,
+#         device_map=device_map
+#         )
+    
+#     tokenizer = load_tokenizer(base_model_name)
+
+#     if trained_model_path is not None:
+#         # Check if this is a local path or HF model ID
+#         is_local_path = os.path.exists(trained_model_path)
+        
+#         if is_local_path:
+#             print(f"Loading trained model from local path: {trained_model_path}")
+            
+#             # Check which structure we have (direct or with adapter_model subdir)
+#             adapter_config_path = os.path.join(trained_model_path, "adapter_config.json")
+#             adapter_model_subdir = os.path.join(trained_model_path, "adapter_model")
+            
+#             # If adapter_config is in a subdirectory, use that path
+#             if not os.path.exists(adapter_config_path) and os.path.exists(adapter_model_subdir):
+#                 adapter_subdir_config = os.path.join(adapter_model_subdir, "adapter_config.json")
+#                 if os.path.exists(adapter_subdir_config):
+#                     print(f"Found adapter config in subdirectory")
+#                     trained_model_path = adapter_model_subdir
+            
+#             try:
+#                 trained_model = PeftModel.from_pretrained(
+#                     base_model,
+#                     trained_model_path,
+#                     device_map=device_map,
+#                     torch_dtype=torch.float16,
+#                     local_files_only=True  # Important: Only use local files
+#                 )
+#                 print(f"Trained model loaded from {trained_model_path}")
+#             except Exception as e:
+#                 print(f"Error loading model: {str(e)}")
+#                 print("Checking for alternative adapter paths...")
+                
+#                 # Try with different common structures
+#                 possible_paths = [
+#                     os.path.join(trained_model_path, "adapter_model"),
+#                     os.path.dirname(trained_model_path),  # Try parent directory
+#                     os.path.join(os.path.dirname(trained_model_path), "adapter_model")
+#                 ]
+                
+#                 for path in possible_paths:
+#                     if os.path.exists(path) and os.path.exists(os.path.join(path, "adapter_config.json")):
+#                         print(f"Trying alternative path: {path}")
+#                         try:
+#                             trained_model = PeftModel.from_pretrained(
+#                                 base_model,
+#                                 path,
+#                                 device_map=device_map,
+#                                 torch_dtype=torch.float16,
+#                                 local_files_only=True
+#                             )
+#                             print(f"Successfully loaded model from {path}")
+#                             break
+#                         except Exception as nested_error:
+#                             print(f"Failed with path {path}: {str(nested_error)}")
+#                 else:
+#                     # If all paths failed, just use the base model
+#                     print("Could not load trained model, using base model instead")
+#                     trained_model = base_model
+#         else:
+#             # Assume it's a Hugging Face Hub model ID
+#             print(f"Loading trained model from Hugging Face Hub: {trained_model_path}")
+#             try:
+#                 trained_model = PeftModel.from_pretrained(
+#                     base_model,
+#                     trained_model_path,
+#                     device_map=device_map,
+#                     torch_dtype=torch.float16
+#                 )
+#                 print(f"Trained model loaded from HF Hub: {trained_model_path}")
+#             except Exception as e:
+#                 print(f"Error loading model from HF Hub: {str(e)}")
+#                 print("Using base model instead")
+#                 trained_model = base_model
+#     else: 
+#         trained_model = base_model
+#         # Load the base model without LoRA
+#         print(f"Base model loaded from {base_model_name}")
+    
+#     # Enable KV caching for faster inference
+#     if hasattr(trained_model, "config"):
+#         trained_model.config.use_cache = True
+    
+#     return trained_model, tokenizer  
 
 def save_model(model, output_dir: str):
     """
