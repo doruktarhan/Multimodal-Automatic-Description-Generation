@@ -22,28 +22,44 @@ from Evaluation.train_eval_metrics import evaluate_model
 from Inference.generate_samples_inference import generate_samples
 
 
+# -------------------- CONFIGURATION --------------------
+# Set this to True to use the base model without fine-tuning
+USE_BASE_MODEL = True  # Change this to True to use base model
+test_mode = True
+test_batches = 2
+
 test_data_path = "Data/test_data.json"
-
-custom_dataloader = CustomDataLoader(test_data_path)
-
-data = custom_dataloader.load_all()
-print(len(data))
-
 model_name = "Qwen/Qwen2.5-3B-Instruct"
+trained_model_short_path = "saved_model_qwen3b_5e-05_64_8_20250411_183252/epoch1_full"
 
 
-import os
+# Model paths and settings
+if not USE_BASE_MODEL:
+    # Path to fine-tuned model (relative to project root)
+    inference_output = f"Inference_output/{trained_model_short_path}/generated_samples.json"
+else:
+    # Using base model
+    trained_model_short_path = None
+    inference_output = "Inference_output/base_model/generated_samples.json"
 
-# Get the absolute path to your model directory
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(current_dir)  # Move up one level if needed
-short_path = "saved_model_qwen3b_5e-05_64_8_20250411_183252/epoch1_full"
-trained_model_path = os.path.join(project_dir, short_path)
+# -------------------- DATA LOADING --------------------
+custom_dataloader = CustomDataLoader(test_data_path)
+data = custom_dataloader.load_all()
+print(f"Loaded {len(data)} test samples")
 
+# -------------------- MODEL LOADING --------------------
+# Get the absolute path to your model directory if using fine-tuned model
+if trained_model_short_path:
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_dir = os.path.dirname(current_dir)  # Move up one level if needed
+    trained_model_path = os.path.join(project_dir, trained_model_short_path)
+else:
+    trained_model_path = None  # This will load the base model
 
-# 8 bit error on quantization
-inference_output = "Inference_output/" + short_path + "/generated_samples.json"
-#load the trained model if train data path exists
+# Create output directory if it doesn't exist
+os.makedirs(os.path.dirname(inference_output), exist_ok=True)
+
+# Load model and tokenizer
 model, tokenizer = load_trained_model(
     base_model_name=model_name,
     trained_model_path=trained_model_path,
@@ -51,21 +67,27 @@ model, tokenizer = load_trained_model(
     device_map="auto"
 )
 
+model_type = "base model" if USE_BASE_MODEL else f"fine-tuned model from {trained_model_short_path}"
+print(f"Using {model_type}")
 print(f"Model loaded from {model_name}, torch dtype: {model.dtype}, device map: {model.hf_device_map}")
 
+# -------------------- GENERATION --------------------
 preprocessor = Preprocessor()
 
 generated_samples = generate_samples(
     model=model,
-    tokenizer= tokenizer,
+    tokenizer=tokenizer,
     preprocessor=preprocessor,
     test_data=data,
     batch_size=8,
     max_length=1000,
-    temperature=None,  # Doesn't matter
-    top_k=None,         # Doesn't matter
-    top_p=None,         # Doesn't matter when do sample is false
-    do_sample=False, #for greedy decoding
-    output_path = inference_output
+    temperature=0.1,  # Doesn't matter
+    top_k=50,        # Doesn't matter
+    top_p=0.9,        # Doesn't matter when do sample is false
+    do_sample=True,   # For greedy decoding
+    output_path=inference_output,
+    test_mode = test_mode,
+    test_batches = test_batches
 )
-print(f"Generation finished")
+
+print(f"Generation finished. Results saved to {inference_output}")

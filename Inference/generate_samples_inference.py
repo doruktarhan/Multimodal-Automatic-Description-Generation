@@ -11,8 +11,9 @@ from torch.utils.data import DataLoader
 # Import custom modules
 from Data.custom_dataloader import CustomDataLoader
 from Data.preprocessor import Preprocessor
-from Data.dataset import RealEstateDataset, collate_fn
+from Data.dataset import RealEstateDatasetForInference, collate_fn
 from Model.model_utils import load_tokenizer
+
 
 def generate_samples(
     model,
@@ -31,6 +32,8 @@ def generate_samples(
     seed: int = 42,
     verbose: bool = True,
     early_stopping: bool = True,
+    test_mode: bool = False,  # New parameter for test mode
+    test_batches: int = 2,    # Number of batches to process in test mode
 ):
     """
     Generate descriptions for a list of test samples using a trained model.
@@ -52,6 +55,8 @@ def generate_samples(
         seed: Random seed for reproducibility
         verbose: Whether to print progress and timing information
         early_stopping: Whether to stop generation early on EOS token
+        test_mode: Whether to run in test mode (process only a few batches)
+        test_batches: Number of batches to process in test mode
         
     Returns:
         Dictionary mapping property IDs to generated descriptions
@@ -63,6 +68,8 @@ def generate_samples(
             torch.cuda.manual_seed_all(seed)
     
     if verbose:
+        if test_mode:
+            print(f"Running in TEST MODE - will only process {test_batches} batches")
         print(f"Starting generation for {len(test_data)} samples with batch size {batch_size}")
     
     # Check device
@@ -77,6 +84,13 @@ def generate_samples(
     # Ensure model is in evaluation mode
     model.eval()
     
+    # In test mode, limit the number of samples to process
+    if test_mode:
+        samples_to_process = min(test_batches * batch_size, len(test_data))
+        if verbose:
+            print(f"Test mode: Processing only {samples_to_process} samples")
+        test_data = test_data[:samples_to_process]
+    
     # Extract property IDs for reference
     property_ids = []
     for item in test_data:
@@ -88,12 +102,11 @@ def generate_samples(
         print("Creating dataset from test data...")
     
     start_dataset_time = time.time()
-    dataset = RealEstateDataset.from_preprocessor(
+    dataset = RealEstateDatasetForInference.from_preprocessor(
         raw_data=test_data,
         preprocessor=preprocessor,
         tokenizer=tokenizer,
-        max_input_length=max_length,
-        max_output_length=max_length
+        max_input_length=max_length
     )
     
     if verbose:
@@ -110,6 +123,8 @@ def generate_samples(
     
     if verbose:
         print(f"Created DataLoader with {len(dataloader)} batches")
+        if test_mode:
+            print(f"In test mode: will process only {min(test_batches, len(dataloader))} batches")
     
     # Prepare results dictionary
     results = {}
@@ -121,6 +136,12 @@ def generate_samples(
     
     # Process each batch
     for batch_idx, batch in enumerate(tqdm(dataloader, desc="Generating", disable=not verbose)):
+        # In test mode, process only the specified number of batches
+        if test_mode and batch_idx >= test_batches:
+            if verbose:
+                print(f"Test mode: Stopping after {test_batches} batches")
+            break
+            
         batch_start_idx = batch_idx * batch_size
         batch_end_idx = min(batch_start_idx + batch_size, len(property_ids))
         batch_property_ids = property_ids[batch_start_idx:batch_end_idx]
@@ -129,13 +150,10 @@ def generate_samples(
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
         
-        # Extract input lengths for later separating input from output
-        input_lengths = []
-        for i in range(input_ids.size(0)):
-            # Find where labels stop being -100 (that's where input ends)
-            labels = batch["labels"][i]
-            input_length = sum(1 for x in labels if x == -100)
-            input_lengths.append(input_length)
+        # We simply track the input length for each example to know where generation begins
+        input_lengths = [len(ids) for ids in batch["input_ids"]]
+        
+
         
         # Generate outputs
         batch_start_time = time.time()
@@ -191,6 +209,11 @@ def generate_samples(
             
             # Store in results
             results[prop_id] = text.strip()
+            
+            # In test mode, print the first few characters of the result
+            if test_mode and verbose:
+                preview = text[:100] + "..." if len(text) > 100 else text
+                print(f"\nSample output for {prop_id}:\n{preview}")
         
         # Clear GPU cache between batches
         if device == "cuda" and torch.cuda.is_available():
@@ -202,12 +225,13 @@ def generate_samples(
     avg_tokens_per_sec = total_tokens_generated / total_time if total_time > 0 else 0
     
     perf_stats = {
-        "total_samples": len(test_data),
+        "total_samples": len(results),
         "total_tokens_generated": total_tokens_generated,
         "total_time_seconds": total_time,
         "tokens_per_second": avg_tokens_per_sec,
         "average_batch_time": sum(batch_times) / len(batch_times) if batch_times else 0,
-        "batch_size": batch_size
+        "batch_size": batch_size,
+        "test_mode": test_mode
     }
     
     if verbose:
@@ -216,6 +240,8 @@ def generate_samples(
         print(f"- Total generation time: {total_time:.2f}s")
         print(f"- Average speed: {avg_tokens_per_sec:.2f} tokens/second")
         print(f"- Average batch time: {perf_stats['average_batch_time']:.2f}s")
+        if test_mode:
+            print(f"- TEST MODE was enabled - only processed {min(test_batches, len(dataloader))} batches")
     
     # Save results if output path is provided
     if output_path:
@@ -235,93 +261,3 @@ def generate_samples(
             print(f"Results saved to {output_path}")
     
     return results
-
-def main(
-    base_model_name: str,
-    test_data_path: str,
-    trained_model_path: Optional[str] = None,
-    output_path: str = "generated_descriptions.json",
-    batch_size: int = 4,
-    max_length: int = 1024,
-    quantization_bits: int = 8,
-    temperature: float = 0.7,
-):
-    """
-    Main function to load model and generate descriptions.
-    
-    Args:
-        base_model_name: Base model name or path
-        test_data_path: Path to test data
-        trained_model_path: Path to trained model (if None, uses base model)
-        output_path: Path to save the generated descriptions
-        batch_size: Batch size for generation
-        max_length: Maximum generation length
-        quantization_bits: Quantization bits (0, 4, or 8)
-        temperature: Temperature for generation
-    """
-    from Model.model_utils import load_trained_model
-    
-    # Load test data
-    print(f"Loading test data from {test_data_path}...")
-    loader = CustomDataLoader(test_data_path)
-    test_data = loader.load_all()
-    print(f"Loaded {len(test_data)} test samples")
-    
-    # Create preprocessor
-    preprocessor = Preprocessor()
-    
-    # Load model and tokenizer
-    model, tokenizer = load_trained_model(
-        base_model_name=base_model_name,
-        trained_model_path=trained_model_path,
-        quantization_bits=quantization_bits
-    )
-    
-    # Generate descriptions
-    results = generate_samples(
-        model=model,
-        tokenizer=tokenizer,
-        test_data=test_data,
-        preprocessor=preprocessor,
-        batch_size=batch_size,
-        max_length=max_length,
-        temperature=temperature,
-        output_path=output_path
-    )
-    
-    print("Inference completed successfully!")
-    return results
-
-if __name__ == "__main__":
-    import argparse
-    
-    parser = argparse.ArgumentParser(description="Generate real estate descriptions")
-    parser.add_argument("--base_model", type=str, default="Qwen/Qwen2.5-3B-Instruct",
-                        help="Base model name or path")
-    parser.add_argument("--test_data", type=str, required=True,
-                        help="Path to test data")
-    parser.add_argument("--trained_model_path", type=str, default=None,
-                        help="Path to trained model (if None, uses base model)")
-    parser.add_argument("--output_path", type=str, default="generated_descriptions.json",
-                        help="Path to save generated descriptions")
-    parser.add_argument("--batch_size", type=int, default=4,
-                        help="Batch size for generation")
-    parser.add_argument("--max_length", type=int, default=1024,
-                        help="Maximum generation length")
-    parser.add_argument("--quantization", type=int, default=8, choices=[0, 4, 8],
-                        help="Quantization bits (0, 4, or 8)")
-    parser.add_argument("--temperature", type=float, default=0.7,
-                        help="Temperature for generation sampling")
-    
-    args = parser.parse_args()
-    
-    main(
-        base_model_name=args.base_model,
-        test_data_path=args.test_data,
-        trained_model_path=args.trained_model_path,
-        output_path=args.output_path,
-        batch_size=args.batch_size,
-        max_length=args.max_length,
-        quantization_bits=args.quantization,
-        temperature=args.temperature
-    )
