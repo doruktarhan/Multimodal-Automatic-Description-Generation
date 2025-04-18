@@ -1,3 +1,9 @@
 thesis_project/
 __pycache__
 test_runs_git_commands.txt
+dummy
+train_data.json
+test_data.json
+saved_model*
+Inference_output
+wandb

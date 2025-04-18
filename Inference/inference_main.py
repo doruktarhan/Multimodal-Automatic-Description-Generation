@@ -24,23 +24,25 @@ from Inference.generate_samples_inference import generate_samples
 
 # -------------------- CONFIGURATION --------------------
 # Set this to True to use the base model without fine-tuning
-USE_BASE_MODEL = True  # Change this to True to use base model
+USE_BASE_MODEL = False  # Change this to True to use base model
 test_mode = True
 test_batches = 2
 
 test_data_path = "Data/test_data.json"
 model_name = "Qwen/Qwen2.5-3B-Instruct"
-trained_model_short_path = "saved_model_qwen3b_5e-05_64_8_20250411_183252/epoch1_full"
+trained_model_short_path = "saved_model_qwen3b_1e-05_64_0_20250417_002746/epoch5_full"
 
 
+# Model paths and settings
 # Model paths and settings
 if not USE_BASE_MODEL:
     # Path to fine-tuned model (relative to project root)
     inference_output = f"Inference_output/{trained_model_short_path}/generated_samples.json"
 else:
-    # Using base model
-    trained_model_short_path = None
-    inference_output = "Inference_output/base_model/generated_samples.json"
+    # Strip the epoch part from the path to get the base directory
+    # Example: "saved_model_qwen3b_5e-05_32_0_20250416_140314/epoch3_full" -> "saved_model_qwen3b_5e-05_32_0_20250416_140314"
+    base_dir = trained_model_short_path.split('/')[0]  # Get only the first part before the slash
+    inference_output = f"Inference_output/{base_dir}/base_model/generated_samples.json"
 
 # -------------------- DATA LOADING --------------------
 custom_dataloader = CustomDataLoader(test_data_path)
@@ -87,7 +89,8 @@ generated_samples = generate_samples(
     do_sample=True,   # For greedy decoding
     output_path=inference_output,
     test_mode = test_mode,
-    test_batches = test_batches
+    test_batches = test_batches,
+    num_beams = 3
 )
 
 print(f"Generation finished. Results saved to {inference_output}")

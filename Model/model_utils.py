@@ -1,6 +1,6 @@
 import torch
 import os
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, TaskType, PeftModel
 from typing import Dict, Any, Optional, Tuple
 
@@ -64,27 +64,30 @@ def create_lora_config(
     )
 
 
-def create_quantization_config(bits: int = 4, use_double_quant: bool = True) -> Dict[str, Any]:
+def create_quantization_config(bits: int = 4, use_double_quant: bool = True):
     """
-    Create a configuration for model quantization.
+    Create a configuration for model quantization using BitsAndBytesConfig.
     
     Args:
         bits: Number of bits for quantization (4 or 8)
         use_double_quant: Whether to use double quantization for further memory saving
         
     Returns:
-        Quantization configuration dictionary
+        BitsAndBytesConfig object
     """
     if bits not in [4, 8]:
         raise ValueError(f"Bits must be 4 or 8, got {bits}")
     
-    # Configure quantization (bitsandbytes library)
-    return {
-        f"load_in_{bits}bit": True,
-        f"bnb_{bits}bit_quant_type": "nf4" if bits == 4 else "fp8",
-        f"bnb_{bits}bit_compute_dtype": torch.float16,
-        f"bnb_{bits}bit_use_double_quant": use_double_quant
-    }
+    # Use the official BitsAndBytesConfig class instead of raw parameters
+    return BitsAndBytesConfig(
+        load_in_4bit=(bits == 4),
+        load_in_8bit=(bits == 8),
+        llm_int8_threshold=6.0,
+        llm_int8_has_fp16_weight=False,
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=use_double_quant,
+        bnb_4bit_quant_type="nf4" if bits == 4 else "fp4"
+    )
 
 
 def load_model(
@@ -119,7 +122,7 @@ def load_model(
     # Add quantization config if requested
     if quantization_bits in [4, 8]:
         quant_config = create_quantization_config(quantization_bits)
-        model_kwargs.update(quant_config)
+        model_kwargs["quantization_config"] = quant_config  # Use the new parameter name
     
     # Load the base model
     model = AutoModelForCausalLM.from_pretrained(
