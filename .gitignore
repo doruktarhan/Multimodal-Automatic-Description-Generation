@@ -7,3 +7,9 @@ test_data.json
 saved_model*
 Inference_output
 wandb
+chat_template_test
+Funda_scrappper
+classified_data
+Data_Analysis
+final_train_data
+funda_data

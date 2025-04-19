@@ -1,6 +1,7 @@
 #preprocessor.py
 import json
 from typing import List, Dict, Any
+import textwrap
 
 class Preprocessor:
     """
@@ -36,6 +37,39 @@ class Preprocessor:
     """
         return prompt
     
+
+    def generate_chat_template(self, item: dict) -> dict[str, str]:
+        system_prompt = (
+            "You are a real‑estate agent responsible for writing property "
+            "descriptions using the given metadata of the house.\n"
+            "Always produce the following sections once and in this order:\n"
+            "1. INTRODUCTION – brief overview\n"
+            "2. LAYOUT – describe rooms and spaces\n"
+            "3. LOCATION – info about the neighbourhood\n"
+            "4. SPECIAL FEATURES – bullet list of key selling points\n\n"
+            "Rules:\n"
+            "• Mention only features present in the metadata.\n"
+            "• Don’t invent amenities, locations or measurements if not necessary.\n"
+            "• Start your answer after the literal text “PROPERTY DESCRIPTION:” "
+            "and begin with “INTRODUCTION: ”."
+        )
+
+        raw_user = f"""
+        Property name: {item.get('property_name', 'N/A')}
+        Neighbourhood: {item.get('neighborhood', 'N/A')}
+
+        FEATURES JSON:
+        {json.dumps(item.get('features', {}), indent=2)}
+
+        Write a compelling property description that highlights the main features and benefits below.
+        """
+
+        user_prompt = textwrap.dedent(raw_user).strip()
+
+        return {"system_prompt": system_prompt, "user_prompt": user_prompt}
+
+
+
     def create_example(self, item: Dict[str, Any]) -> Dict[str, str]:
         """
         Create a single training example from a property item
@@ -58,6 +92,24 @@ class Preprocessor:
             "input": input_text,
             "output": output_text
         }
+    
+    def create_chat_example(self, item: dict) -> list[dict[str, str]] | None:
+        # Skip items without usable description
+        desc = item.get("description", "")
+        if not desc.strip():
+            return None
+
+        prompts   = self.generate_chat_template(item)
+        # If you really want the header, add it here:
+        # target = f"PROPERTY DESCRIPTION:\n{desc.rstrip()}"
+        target = desc.rstrip()
+
+        messages = [
+            {"role": "system",    "content": prompts["system_prompt"]},
+            {"role": "user",      "content": prompts["user_prompt"]},
+            {"role": "assistant", "content": target}
+        ]
+        return messages
 
 
     def process_data(self, data: List[Dict[str, Any]]) -> List[Dict[str, str]]:
@@ -73,7 +125,7 @@ class Preprocessor:
         processed_examples = []
         
         for item in data:
-            example = self.create_example(item)
+            example = self.create_chat_example(item)
             if example:  # Skip None results (items without descriptions)
                 processed_examples.append(example)
         

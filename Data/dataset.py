@@ -4,21 +4,29 @@ from torch.utils.data import Dataset
 from typing import List, Dict, Any, Optional
 
 
+import torch
+from torch.utils.data import Dataset
+from typing import List, Dict, Any
+
+from Data.chat_template_utils import is_qwen_text_model, get_qwen_chat_template, initialize_chat_template
+
+
 class RealEstateDataset(Dataset):
-    """Dataset Pytorch class for real estate description generation"""
+    """Dataset Pytorch class for real estate description generation using chat template"""
 
     def __init__(
             self,
-            examples: List[Dict[str,str]],
+            examples: List[List[Dict]],  # List of message lists (each item is a conversation)
             tokenizer,
             max_input_length: int = 32768,
             max_output_length: int = 32768
             ):
         """
-        Initialize the dataset with examples and tokenizer
+        Initialize the dataset with chat examples and tokenizer
         
         Args:
-            examples: List of preprocessed examples with 'input' and 'output' keys
+            examples: List of conversations where each conversation is a list of message dicts
+                     Each message dict should have 'role' and 'content' keys
             tokenizer: Tokenizer for the language model
             max_input_length: Maximum length for input sequences
             max_output_length: Maximum length for output sequences
@@ -28,11 +36,14 @@ class RealEstateDataset(Dataset):
         self.max_input_length = max_input_length
         self.max_output_length = max_output_length
 
+        # Initialize the chat template
+        self.template_modified = initialize_chat_template(self.tokenizer)
+
     def __len__(self):
         """Return the number of examples"""
         return len(self.examples)
 
-    def __getitem__(self,idx):
+    def __getitem__(self, idx):
         """
         Get a tokenized example at the given index
         
@@ -42,34 +53,27 @@ class RealEstateDataset(Dataset):
         Returns:
             Dictionary with input_ids, attention_mask, and labels
         """
+        messages = self.examples[idx]
 
-        example = self.examples[idx]
-        input_text = example['input']
-        output_text = example['output']
+        max_length = self.max_input_length + self.max_output_length
 
-        # Tokenize input and output separately
-        input_encodings = self.tokenizer(
-            input_text,
-            max_length=self.max_input_length,
-            truncation=True,
-            padding=False,  # No padding at item level
-            return_tensors=None  # Return lists, not tensors
+
+
+        rendered_text = self.tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            max_length=max_length,
+            add_generation_prompt=False,
+            return_assistant_tokens_mask=True,
+            return_dict=True
         )
-        
-        output_encodings = self.tokenizer(
-            output_text + self.tokenizer.eos_token,
-            max_length=self.max_output_length,
-            truncation=True,
-            padding=False,
-            return_tensors=None
-        )
-        
-        # Combine input and output tokens
-        input_ids = input_encodings["input_ids"] + output_encodings["input_ids"]
-        attention_mask = input_encodings["attention_mask"] + output_encodings["attention_mask"]
-        
-        # Create labels: -100 for input tokens, actual tokens for output
-        labels = [-100] * len(input_encodings["input_ids"]) + output_encodings["input_ids"]
+
+        input_ids = rendered_text["input_ids"]
+        attention_mask = rendered_text["attention_mask"]
+        assistant_mask = rendered_text["assistant_masks"]
+
+        # Set labels to -100 for non-assistant tokens (they'll be ignored in loss computation)
+        labels = torch.tensor([-100 if mask == 0 else token for token, mask in zip(input_ids, assistant_mask)])
         
         return {
             "input_ids": torch.tensor(input_ids),
@@ -77,8 +81,6 @@ class RealEstateDataset(Dataset):
             "labels": torch.tensor(labels)
         }
     
-    #instead of creating the examples and than create the dataset with those examples,
-    #we can create the dataset directly from the raw data calling this method
     @classmethod
     def from_preprocessor(
         cls, 
@@ -93,7 +95,7 @@ class RealEstateDataset(Dataset):
         
         Args:
             raw_data: List of raw property data dictionaries
-            preprocessor: Preprocessor to convert raw data to examples
+            preprocessor: Preprocessor to convert raw data to chat examples
             tokenizer: Tokenizer for the language model
             max_input_length: Maximum length for input sequences
             max_output_length: Maximum length for output sequences
@@ -103,28 +105,26 @@ class RealEstateDataset(Dataset):
         """
         examples = preprocessor.process_data(raw_data)
         return cls(examples, tokenizer, max_input_length, max_output_length)
-
+    
 
 class RealEstateDatasetForInference(Dataset):
     """Dataset Pytorch class for real estate description inference"""
     
     def __init__(
             self,
-            examples: List[Dict[str,str]],
+            examples: List,  # This can be either list of message lists or list of dicts
             tokenizer,
             max_input_length: int = 32768,
             ):
         """
         Initialize the dataset with examples and tokenizer
-        
-        Args:
-            examples: List of preprocessed examples with 'input' key only
-            tokenizer: Tokenizer for the language model
-            max_input_length: Maximum length for input sequences
         """       
         self.examples = examples
         self.tokenizer = tokenizer
         self.max_input_length = max_input_length
+        
+        # Initialize the chat template
+        self.template_modified = initialize_chat_template(self.tokenizer)
 
     def __len__(self):
         """Return the number of examples"""
@@ -133,28 +133,43 @@ class RealEstateDatasetForInference(Dataset):
     def __getitem__(self, idx):
         """
         Get a tokenized example at the given index
-        
-        Args:
-            idx: Index of the example to get
-            
-        Returns:
-            Dictionary with input_ids and attention_mask
         """
         example = self.examples[idx]
-        input_text = example['input']
-
-        # Tokenize input
-        input_encodings = self.tokenizer(
-            input_text,
-            max_length=self.max_input_length,
-            truncation=True,
-            padding=False,  # No padding at item level
-            return_tensors=None  # Return lists, not tensors
-        )
         
-        # Get input tokens
-        input_ids = input_encodings["input_ids"] 
-        attention_mask = input_encodings["attention_mask"]  
+        # Check if example is in chat format (list of message dicts) or single dict format
+        if isinstance(example, list):
+            # Chat format - use apply_chat_template
+            messages = example
+            rendered_text = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=True,
+                max_length=self.max_input_length,
+                add_generation_prompt=True,
+                return_assistant_tokens_mask=True,
+                return_dict=True
+            )
+            
+            input_ids = rendered_text["input_ids"]
+            attention_mask = rendered_text["attention_mask"]
+        
+        elif isinstance(example, dict) and "input" in example:
+            # Old format with plain text input
+            input_text = example["input"]
+            
+            # Tokenize input
+            encoding = self.tokenizer(
+                input_text,
+                max_length=self.max_input_length,
+                truncation=True,
+                padding=False,
+                return_tensors=None
+            )
+            
+            input_ids = encoding["input_ids"]
+            attention_mask = encoding["attention_mask"]
+        
+        else:
+            raise ValueError(f"Unsupported example format: {type(example)}")
         
         return {
             "input_ids": torch.tensor(input_ids),
@@ -168,98 +183,87 @@ class RealEstateDatasetForInference(Dataset):
         preprocessor, 
         tokenizer, 
         max_input_length: int = 32768, 
+        use_chat_format: bool = True,  # New parameter to control format
     ):
         """
         Create a dataset directly from raw data using a preprocessor
-        
-        Args:
-            raw_data: List of raw property data dictionaries
-            preprocessor: Preprocessor to convert raw data to examples
-            tokenizer: Tokenizer for the language model
-            max_input_length: Maximum length for input sequences
-            
-        Returns:
-            Initialized RealEstateDatasetForInference
         """
-        # For inference, we only need the input part
         examples = []
-        for item in raw_data:
-            # Generate prompt for this item
-            prompt = preprocessor.generate_prompt(item)
-            examples.append({"input": prompt})
+        
+        if use_chat_format:
+            # Create examples in chat format
+            for item in raw_data:
+                chat_msgs = preprocessor.generate_chat_template(item)
+                messages = [
+                    {"role": "system", "content": chat_msgs["system_prompt"]},
+                    {"role": "user", "content": chat_msgs["user_prompt"]}
+                ]
+                examples.append(messages)
+        else:
+            # Create examples in old format with "input" key
+            for item in raw_data:
+                prompt = preprocessor.generate_prompt(item)
+                examples.append({"input": prompt})
         
         return cls(examples, tokenizer, max_input_length)
 
 
-def collate_fn(batch):
+
+def collate_fn(batch, pad_token_id=0):
     """
-    Custom collation function for dynamic padding of batches
+    Custom collate function for chat template-based dataset
     
     Args:
-        batch: List of dictionaries, each with input_ids, attention_mask, and labels
+        batch: List of dictionaries with input_ids, attention_mask, and optional labels
+        pad_token_id: Token ID to use for padding (default: 0)
         
     Returns:
-        Batch dictionary with padded tensors
+        Dictionary with padded and batched tensors
     """
-    # Determine max length in this batch
-    max_input_len = max([len(x["input_ids"]) for x in batch])
+    # Extract the max length in this batch
+    max_length = max([len(item['input_ids']) for item in batch])
     
-    # Initialize padded tensors
-    input_ids = []
-    attention_mask = []
-    labels = []
+    # Initialize lists for batch items
+    input_ids_batch = []
+    attention_mask_batch = []
+    labels_batch = []
     
-    # Get pad token id from the first example (safer approach)
-    pad_token_id = 0  # Default pad token ID
-    
-    # Check if this batch contains labels (training) or not (inference)
-    has_labels = "labels" in batch[0]
-    
-    # Pad sequences to max length in batch
+    # Process each item in the batch
     for item in batch:
-        # Get current lengths
-        curr_len = len(item["input_ids"])
-        pad_len = max_input_len - curr_len
+        # Get the current length
+        curr_length = len(item['input_ids'])
+        padding_length = max_length - curr_length
         
-        # Skip padding if not needed
-        if pad_len == 0:
-            input_ids.append(item["input_ids"])
-            attention_mask.append(item["attention_mask"])
-            if has_labels:
-                labels.append(item["labels"])
-            continue
-        
-        # Pad input_ids with pad_token_id
+        # Pad the input_ids with pad_token_id
         padded_input_ids = torch.cat([
-            item["input_ids"],
-            torch.full((pad_len,), pad_token_id, dtype=torch.long)
+            item['input_ids'],
+            torch.full((padding_length,), pad_token_id, dtype=torch.long)
         ])
+        input_ids_batch.append(padded_input_ids)
         
-        # Pad attention_mask with 0s
+        # Pad the attention_mask with zeros
         padded_attention_mask = torch.cat([
-            item["attention_mask"],
-            torch.zeros(pad_len, dtype=torch.long)
+            item['attention_mask'],
+            torch.zeros(padding_length, dtype=torch.long)
         ])
+        attention_mask_batch.append(padded_attention_mask)
         
-        input_ids.append(padded_input_ids)
-        attention_mask.append(padded_attention_mask)
-        
-        # Pad labels with -100 if they exist
-        if has_labels:
+        # Only process labels if they exist in the item
+        if 'labels' in item:
             padded_labels = torch.cat([
-                item["labels"],
-                torch.full((pad_len,), -100, dtype=torch.long)
+                item['labels'],
+                torch.full((padding_length,), -100, dtype=torch.long)
             ])
-            labels.append(padded_labels)
+            labels_batch.append(padded_labels)
     
-    # Stack tensors
+    # Stack all tensors into batches
     result = {
-        "input_ids": torch.stack(input_ids),
-        "attention_mask": torch.stack(attention_mask),
+        "input_ids": torch.stack(input_ids_batch),
+        "attention_mask": torch.stack(attention_mask_batch),
     }
     
-    # Add labels if they exist
-    if has_labels:
-        result["labels"] = torch.stack(labels)
+    # Only include labels in the result if they were present
+    if labels_batch:
+        result["labels"] = torch.stack(labels_batch)
     
     return result
