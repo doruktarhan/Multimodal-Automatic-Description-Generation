@@ -1,0 +1,346 @@
+# Directory settings
+directories:
+  #base_dir: "/Users/doruktarhan/Desktop/Master Thesis Model Runs/LLM_7B_Free_Prompt"
+  base_dir: "/Users/doruktarhan/Desktop/Master Thesis Model Runs/NOT USED/LLM_3B_1"
+  test_data_path: "Data/test_data.json"
+  inference_output_dir: "Inference_output"
+  evaluated_model_train_folder_path: "base_model"
+
+built_in_metrics:
+  - name: "coherence"
+    template_key: "COHERENCE"
+  - name: "fluency"
+    template_key: "FLUENCY"
+  - name: "groundedness"
+    template_key: "GROUNDEDNESS"
+  - name: "instruction_following"
+    template_key: "INSTRUCTION_FOLLOWING"
+
+# Metrics definitions
+metrics:
+  - name: "location_informativeness_v1"
+    description: "Assesses the richness, detail, and relevance of information provided in the 'response' about the property's location, neighborhood characteristics, amenities, transportation, and lifestyle aspects. A higher score indicates a more comprehensive and useful location description."
+    criteria:
+      detail_on_neighborhood_character: "The 'response' describes the atmosphere, style (e.g., historic, modern, residential, lively), or general character of the neighborhood."
+      mention_of_local_amenities_and_pois: "The 'response' includes information about relevant local amenities (e.g., shops, restaurants, cafes, schools, parks, healthcare) or points of interest (POIs) that contribute to understanding the area's convenience and appeal."
+      information_on_transportation_and_accessibility: "The 'response' provides details about transportation links (e.g., public transport, major roads, cycling paths) or general accessibility of the location."
+      lifestyle_and_suitability_insights: "The 'response' offers insights into the lifestyle the location supports (e.g., family-friendly, good for nightlife, quiet retreat) or its suitability for different types of residents."
+    rating_rubric:
+      "5": "(Very High Informativeness) Provides extensive, specific, and relevant details across multiple aspects (character, amenities/POIs, transport, lifestyle), painting a very clear and comprehensive picture of the location and its benefits. Effectively uses available 'prompt' data and compares favorably to 'reference' in terms of detail."
+      "4": "(High Informativeness) Provides good detail on several aspects of the location, or very strong detail on a few. Offers a clear understanding of the area. May not be as exhaustive as a 5 but is substantially informative."
+      "3": "(Moderate Informativeness) Provides some useful location information, covering at least one or two aspects with adequate detail, or broader aspects with less specificity. The user gets a basic understanding but might desire more."
+      "2": "(Low Informativeness) Provides minimal or very general location information. May name the neighborhood but offers little else of substance regarding its character, amenities, or lifestyle. Details are sparse or overly vague."
+      "1": "(Very Low Informativeness) Provides virtually no useful information about the location beyond perhaps a name, or the information is so generic as to be unhelpful (e.g., 'located in a city')."
+    instruction: |
+      You are an evaluator assessing how informative a property description's 'LOCATION' section (or equivalent location-focused content in the 'response') is for a potential resident.
+      Consider the following aspects: neighborhood character/atmosphere, local amenities (shops, dining, parks, schools), points of interest, transportation/accessibility, and lifestyle implications.
+      - The 'prompt' indicates what location information was *available* to the model. A good response makes the most of this, elaborating where appropriate.
+      - The 'reference' text can serve as a benchmark for the *types and level of detail* typically considered informative and relevant by human writers for such a property.
+      - Your primary focus is on the *quantity, specificity, and relevance* of the location information presented in the 'response'. Accuracy is evaluated by a separate metric.
+      A high score means the location description is rich and provides a good understanding of the area. A low score means it's sparse, vague, or unhelpfully generic.
+    input_variables: ["prompt", "reference", "response"]
+    metric_definition: "This metric measures the comprehensiveness, specificity, and relevance of location-related information in the generated property description. It evaluates how well the text informs a potential resident about the neighborhood's character, amenities, transport links, and lifestyle, without regard to the factual accuracy of these details (which is assessed separately)."
+    evaluation_steps:
+      step_1: "Review the 'prompt' to understand the location-related data provided to the generative model (e.g., neighborhood name, any listed local features/amenities)."
+      step_2: "Review the 'reference' text to get a sense of the typical scope, detail level, and types of information that make a location description informative for this kind of property."
+      step_3: "Analyze the 'LOCATION' section (or equivalent parts) of the 'response'."
+      step_4: "For 'detail_on_neighborhood_character': Assess how well the 'response' describes the general feel, style, or dominant characteristics of the area (e.g., quiet, bustling, historic, family-oriented)."
+      step_5: "For 'mention_of_local_amenities_and_pois': Identify mentions of specific or types of amenities (shops, restaurants, parks, schools, etc.) and points of interest. Note their relevance and specificity."
+      step_6: "For 'information_on_transportation_and_accessibility': Look for details regarding public transport, road access, bike-friendliness, or general ease of getting around."
+      step_7: "For 'lifestyle_and_suitability_insights': Evaluate if the description provides clues about the kind of lifestyle the location enables or who it might be best suited for."
+      step_8: "Considering the amount, specificity, and relevance of details across these areas, and how well it leverages available 'prompt' data and compares in richness to the 'reference', assign a rating from 1 to 5 using the 'rating_rubric'."
+
+  - name: "groundedness_and_factual_accuracy_v2"
+    description: "Assesses if the 'response' is grounded in the 'prompt'. It allows for very general, purely subjective 'flavor' adjectives applied to prompted items, but penalizes adjectives implying specific unverified characteristics, new factual claims, contradictions, or external factual errors."
+    criteria:
+      no_unsubstantiated_specific_claims_or_characteristics: "The 'response' does not introduce: a) specific, verifiable factual claims (e.g., new amenities, objects, unprompted distances) OR b) adjectives implying a specific, potentially verifiable state, style, material, or condition (e.g., 'modern bathroom' if 'modern' unprompted, 'spacious room' if size unprompted, 'granite countertops') that are not present in or directly and obviously inferable from the 'prompt' data."
+      appropriate_use_of_general_subjective_descriptors: "Purely subjective, general 'flavor' adjectives (e.g., 'charming,' 'cozy,' 'lovely,' 'nice') are used appropriately and sparingly to describe features or aspects already mentioned or strongly implied by the 'prompt', without asserting new verifiable properties."
+      no_contradiction_of_prompt: "The 'response' does not contradict any information explicitly stated in the 'prompt' data."
+      external_factual_correctness: "Any broader real-world claims made (e.g., geographical facts beyond the immediate property's description) that are not directly from the 'prompt' data are factually correct."
+    rating_rubric:
+      "5": "(Excellent Grounding & Accuracy) No unsubstantiated specific claims or characteristics. Use of general subjective descriptors is minimal, appropriate, and adds only 'flavor' to prompted items. No contradictions or external factual errors. Highly trustworthy."
+      "4": "(Good) At most, one instance of an adjective implying a minor unverified characteristic (e.g., 'modern bathroom' if 'modern' unprompted) OR a very slight overstep in general subjective description. No introduction of new specific objects/amenities. No direct contradictions or significant external errors. Largely trustworthy."
+      "3": "(Average) Some noticeable instances of unverified specific characteristics (e.g., multiple unprompted 'modern' features, an unprompted 'spacious' claim) OR introduction of a minor, common but unprompted amenity (e.g., 'local supermarket' without prompt support). OR a minor contradiction/external error. Grounding shows weaknesses."
+      "2": "(Poor) Several instances of unsubstantiated specific characteristics/claims OR introduction of a significant unprompted feature/amenity. OR a clear contradiction of 'prompt' OR a significant external factual error. Grounding is weak; information is somewhat unreliable."
+      "1": "(Very Poor) Extensive introduction of unsubstantiated specific characteristics/claims/features. OR major contradictions/external errors. Information is largely ungrounded, fabricated, or incorrect."
+    instruction: |
+      You are an expert real estate content evaluator. Your task is to assess the 'response' for its factual accuracy and strict grounding in the 'prompt' data, while distinguishing acceptable 'flavor' from unverified claims.
+      Carefully evaluate based on these distinctions:
+      1.  **Acceptable General Subjective Flair (Usually Not Penalized if applied to prompted items):** Very general, purely subjective, positive framing adjectives that do NOT imply a new specific, verifiable physical state, style, material or condition beyond what is prompted (e.g., 'charming' area, 'lovely' view if 'view' is prompted, 'nice' room, 'cozy' atmosphere if 'atmosphere' is prompted). These should be used sparingly.
+      2.  **Unsubstantiated Specific Characteristics (To be penalized if not in 'prompt'):** Adjectives or phrases implying a specific, potentially verifiable state, style, material, size, or condition not found in or directly inferable from the 'prompt' (e.g., 'modern bathroom' if 'prompt' only says 'bathroom'; 'spacious living room' if dimensions aren't given to support 'spacious'; 'recently renovated'; 'granite countertops'; 'hardwood floors').
+      3.  **Unsubstantiated Specific Factual Claims (To be penalized):** Introduction of new, verifiable objects, amenities, or specific features not found in the 'prompt' (e.g., 'cafes within walking distance', 'a private gym', 'nearby park X' if not mentioned).
+      4.  **Contradictions & External Errors (To be penalized).**
+
+      The 'prompt' is the primary source of truth for what the model *knew*. Do *not* use the 'reference' text to *excuse* claims/characteristics not found in the 'prompt'. 'Reference' and general knowledge are mainly for verifying 'external_factual_correctness' of claims made *beyond* the prompt's scope.
+    input_variables: ["prompt", "reference", "response"]
+    metric_definition: "This metric evaluates if the generated description is factually accurate and strictly grounded in the 'prompt' data. It allows for minimal, purely subjective 'flavor' adjectives on prompted items but penalizes adjectives implying specific unverified characteristics, the invention of new specific factual details, contradictions to the prompt, or external factual errors."
+    evaluation_steps:
+      step_1: "Review the 'prompt' data: identify all listed features, amenities, and any descriptive information about the property or location (e.g., 'bathroom', 'view', 'quiet street')."
+      step_2: "Read the 'response' thoroughly."
+      step_3: "For 'no_unsubstantiated_specific_claims_or_characteristics' and 'appropriate_use_of_general_subjective_descriptors':
+                a. Identify all descriptive adjectives and factual claims in the 'response' about the property and its location.
+                b. For each, determine if it's a purely subjective 'flavor' adjective (e.g., 'nice', 'lovely') applied to an item explicitly mentioned in the 'prompt'. These are generally acceptable if not excessive.
+                c. Determine if it's an adjective implying a specific, verifiable characteristic not in the 'prompt' (e.g., 'modern' for a 'bathroom', 'spacious' for a room without supporting dimensions, 'renovated'). These ARE considered unsubstantiated and should be penalized.
+                d. Determine if it's a new specific object, amenity, or feature not in the 'prompt' (e.g., 'nearby cafes', 'granite countertops'). These ARE unsubstantiated and should be penalized."
+      step_4: "For 'no_contradiction_of_prompt': Identify any statements in the 'response' that directly contradict information explicitly stated in the 'prompt' data."
+      step_5: "For 'external_factual_correctness': Identify any broader, general real-world claims in the 'response' not derived from the 'prompt'. Use the 'reference' text or your general knowledge to verify their factual correctness."
+      step_6: "Based on the number and severity of issues found (especially unsubstantiated specific characteristics (step 3c), unsubstantiated factual claims (step 3d), contradictions (step 4), and external errors (step 5)), assign a rating from 1 to 5 using the 'rating_rubric'. Minimal penalty for appropriate 'flavor' adjectives (step 3b)."
+
+  - name: "key_tabular_info_coverage"
+    description: "Measures whether crucial information from the 'prompt' (tabular input, e.g., number of bedrooms/bathrooms, living area) is present in the 'response' (generated description). The 'reference' text can be used as a secondary guide to gauge the typical importance of non-essential features."
+    criteria:
+      coverage_of_essential_attributes: "Core essential property attributes (e.g., bedroom count, bathroom count, living area m², plot area m², year built, energy label) explicitly present in the 'prompt' are mentioned in the 'response'."
+      coverage_of_other_significant_features: "Other distinct features explicitly listed in the 'prompt' (e.g., 'balcony', 'garage', 'garden type', 'recent renovations'), especially those also highlighted or typically included in the 'reference' text, are mentioned if present in the 'prompt'."
+    rating_rubric:
+      "5": "(Very good) All essential attributes from the 'prompt' are clearly mentioned. Other significant features from the 'prompt', particularly those commonly seen as important (guided by 'reference' context), are also well-covered."
+      "4": "(Good) Almost all essential attributes from the 'prompt' are mentioned. Most other significant features (guided by 'reference' context) are covered. Any omission is minor and doesn't significantly reduce overall informativeness."
+      "3": "(Average) Several essential attributes from the 'prompt' are missing OR some other significant features (highlighted by 'prompt' and often seen in 'reference' context) are missing. Informativeness is noticeably reduced."
+      "2": "(Poor) Many essential attributes from the 'prompt' are missing OR most other significant features (even those commonly important in 'reference' context) are missing. The description lacks critical information that was available in the 'prompt'."
+      "1": "(Very poor) Very few or no essential attributes from the 'prompt' are mentioned. The description is critically uninformative regarding data available in the 'prompt'."
+    instruction: |
+      You are an evaluator focused on information completeness. Your primary task is to assess if the 'response' (generated property description) includes key information that was provided in the 'prompt' (structured data given to the model).
+      A predefined list of 'essential attributes' (e.g., bedrooms, bathrooms, living area m², plot area m², year built, energy label) MUST be checked for coverage if present in the 'prompt'.
+      For 'other significant features' also listed in the 'prompt' (e.g., balcony, garage, specific amenities, renovation details):
+      1. Confirm they were present in the 'prompt'.
+      2. You may use the 'reference' text as a *secondary guide* to understand the *typical importance* or common inclusion of such features by human writers. If a feature is in the 'prompt' AND commonly highlighted in the 'reference', its omission from the 'response' is more significant.
+      3. However, the 'prompt' is the definitive source of what *could* have been mentioned. If the 'reference' omits a key factual attribute clearly present in the 'prompt' (e.g., number of bedrooms), you must still expect the 'response' to cover it if it was in the 'prompt'.
+      Your own judgment on what constitutes a 'significant feature' from the 'prompt' beyond the essential list is also important.
+    input_variables: ["prompt", "reference", "response"]
+    metric_definition: "This metric evaluates if the generated description effectively incorporates and presents important structured information about the property that was provided in the 'prompt'. It prioritizes coverage of essential attributes and then considers other significant features, using the 'reference' text as a contextual aid for judging the importance of these secondary features. Accuracy is a separate metric."
+    evaluation_steps:
+      step_1: "First, identify the predefined 'essential attributes' (bedrooms, bathrooms, living area m², plot area m², year built, energy label) that are present in the 'prompt' data. These are high-priority for coverage."
+      step_2: "Next, identify 'other significant features' and distinct details that are present in the 'prompt' data (e.g., special amenities like 'sauna', structural details like 'new roof', unique aspects like 'sea view')."
+      step_3: "Review the 'reference' text. Note which of the 'other significant features' (identified in step 2 from the 'prompt') are also mentioned or emphasized in the 'reference'. This helps gauge their common perceived importance in this type of listing. However, if an essential attribute (from step 1) is missing in the 'reference' but present in the 'prompt', the 'prompt' takes precedence for coverage expectation."
+      step_4: "Read the 'response'. Check if all 'essential attributes' (from step 1, if in 'prompt') are mentioned."
+      step_5: "Check if the 'other significant features' (from step 2, if in 'prompt') are mentioned in the 'response'. Give more weight to omissions of features that were both in the 'prompt' and also highlighted/present in the 'reference' (as per step 3), or features you deem highly significant from the 'prompt'."
+      step_6: "Based on the completeness of 'essential attributes' and the coverage of 'other significant features' (considering their presence in 'prompt' and contextual importance hinted by 'reference' or your own judgment), assign a rating from 1 to 5 using the 'rating_rubric'. Prioritize coverage of essential attributes first."
+  
+  - name: "tabular_data_accuracy"
+    description: "Checks if the information from the 'prompt' (tabular data) that *is* included in the 'response' (generated description) is stated correctly (e.g., correct number of bedrooms, correct size)."
+    criteria:
+      accuracy_of_numerical_attributes: "Numerical values (e.g., bedroom count, m², year) mentioned in the 'response' match those in the 'prompt'."
+      accuracy_of_categorical_attributes: "Categorical values (e.g., energy label 'A', heating type 'central heating') mentioned in the 'response' match those in the 'prompt'."
+    rating_rubric:
+      "5": "(Very good) All property attributes from the 'prompt' that are mentioned in the 'response' are perfectly accurate."
+      "4": "(Good) At most one minor inaccuracy in a mentioned attribute that doesn't significantly mislead."
+      "3": "(Average) A few minor inaccuracies OR one significant inaccuracy in a mentioned attribute (e.g., wrong bedroom count)."
+      "2": "(Poor) Multiple significant inaccuracies OR many minor inaccuracies in mentioned attributes. The description contains unreliable factual details."
+      "1": "(Very poor) Widespread and significant inaccuracies in mentioned attributes. The factual details provided are largely incorrect."
+    instruction: "You are an evaluator focused on factual precision. Your task is to verify if the details mentioned in the 'response' (generated property description) accurately reflect the values in the 'prompt' (structured data). Focus only on attributes that are *actually mentioned* in the 'response'. Do *not* use the 'reference' text for this evaluation."
+    input_variables: ["prompt", "response"]
+    metric_definition: "This metric assesses the correctness of factual information presented in the generated description when that information originates from the structured 'prompt' data. It ensures that if the model mentions a detail from the input, it does so accurately."
+    evaluation_steps:
+      step_1: "Review the 'prompt' data to understand the correct values for various property attributes."
+      step_2: "Read the 'response' and identify all mentions of specific property attributes (e.g., number of bedrooms, living area, year built, energy label, heating type)."
+      step_3: "For each attribute mentioned in the 'response', compare its stated value against the corresponding value in the 'prompt' data."
+      step_4: "Note any discrepancies for both numerical (e.g., 120 m² vs 125 m²) and categorical (e.g., 'gas heating' vs 'district heating') attributes."
+      step_5: "Based on the number and severity of inaccuracies found, assign a rating from 1 to 5 using the 'rating_rubric'."
+
+  - name: "visual_grounding_evidence"
+    description: "Assesses to what extent the 'response' (generated description from a multimodal model) includes specific descriptive details about the property's appearance, style, condition, or unique visual features that are *not* explicitly stated in the 'prompt' (tabular data) but could plausibly be inferred from images."
+    criteria:
+      presence_of_plausible_visual_details: "The 'response' contains specific descriptive terms or phrases about visual aspects (e.g., 'sun-drenched living room,' 'modern kitchen tiles,' 'well-maintained facade,' 'charming wooden beams') that are not directly found in the 'prompt' data."
+      specificity_and_relevance_of_visual_details: "The visual details mentioned are specific rather than generic, and seem relevant to describing a property's appearance or atmosphere."
+    rating_rubric:
+      "5": "(Very good) Contains multiple, specific, and relevant visual details not present in the 'prompt' that strongly suggest visual input was utilized effectively."
+      "4": "(Good) Contains some specific visual details not in the 'prompt' that suggest visual input was utilized, or several more generic ones."
+      "3": "(Average) Contains a few generic visual details not in the 'prompt', or one somewhat specific detail. The visual contribution is noticeable but not extensive."
+      "2": "(Poor) Contains very few, vague, or potentially clichéd 'visual' details not in 'prompt', or details that could easily be inferred without images (e.g. 'nice kitchen'). Minimal evidence of visual grounding."
+      "1": "(Very poor) No discernible visual details beyond what's in the 'prompt' or extremely generic phrases. Seems to ignore visual input."
+    instruction: "You are an evaluator assessing the impact of visual information. Your task is to determine if the 'response' (generated property description, presumably from a model that saw images) includes details that describe the property's appearance or visual characteristics, which are *not* found in the 'prompt' (tabular data). Do *not* use the 'reference' text for this specific evaluation. You are judging if the text *implies* it saw something beyond the table."
+    input_variables: ["prompt", "response"]
+    metric_definition: "This metric aims to quantify the added value of visual input by identifying descriptive language in the generated text that plausibly stems from observing property images, going beyond the factual, often non-visual, information available in the structured 'prompt' data."
+    evaluation_steps:
+      step_1: "Carefully review the 'prompt' data to understand what factual, non-visual information was provided to the model."
+      step_2: "Read the 'response' (generated description)."
+      step_3: "Identify any words, phrases, or descriptions in the 'response' that pertain to the property's appearance, style, lighting, condition, specific materials, or overall visual ambiance."
+      step_4: "For each identified visual description, check if it is merely a rephrasing of information already present in the 'prompt' data, or if it introduces new, plausibly visual information."
+      step_5: "Assess the specificity and richness of these purely visual details (e.g., 'large windows' is less specific than 'floor-to-ceiling windows offering panoramic views')."
+      step_6: "Based on the quantity, quality, and specificity of visual details not derivable from the 'prompt', assign a rating from 1 to 5 using the 'rating_rubric'."
+  
+  - name: "visual_fabrication_level_tabular"
+    description: "Measures the extent to which the 'response' (generated from tabular-only input) inappropriately includes specific visual descriptions or implies visual observation not supported by the 'prompt' (tabular data). A higher score indicates MORE visual fabrication/hallucination, which is undesirable for a tabular-only model."
+    criteria:
+      extent_of_unsupported_visual_claims: "The quantity of descriptive language in the 'response' implying visual characteristics (e.g., 'sunlit rooms,' 'gleaming hardwood floors,' 'charming blue door') that are NOT explicitly derivable from the 'prompt' data."
+      specificity_of_unsupported_visual_claims: "The unsupported visual claims made in the 'response' are specific and detailed (e.g., 'kitchen with red ceramic tiles') rather than being highly generic or common stylistic phrases (e.g., 'nice kitchen')."
+      misleading_impression_of_visual_input: "The 'response' creates a misleading impression that the model had access to visual information about the property, by fabricating visual 'facts'."
+    rating_rubric:
+      "5": "(Very High Fabrication - Undesirable) 'Response' is replete with numerous, highly specific, visual claims clearly not derivable from 'prompt'. Strongly and misleadingly implies visual observation."
+      "4": "(High Fabrication - Undesirable) 'Response' contains several specific, unsupported visual claims, or many generic ones, giving a clear impression of visual fabrication beyond the 'prompt'."
+      "3": "(Moderate Fabrication - Undesirable) 'Response' includes some noticeable specific unsupported visual claims OR a pattern of generic ones that suggest visual embellishment beyond the 'prompt'."
+      "2": "(Low Fabrication - Better) 'Response' may contain a few minor, generic unsupported visual phrases, possibly similar to common stylistic elements (as might be seen in 'reference'), but largely avoids inventing specific visual features. Minimal misleading impression."
+      "1": "(Very Low/No Fabrication - Desirable) 'Response' primarily uses information derivable from 'prompt'. Any 'visual-like' language is extremely minimal, highly generic, and clearly stylistic, not presenting new 'facts'. No specific unsupported visual claims; appropriately non-visual for a tabular-only model."
+    instruction: |
+      You are an evaluator assessing the grounding of a property description. The 'response' text was generated by a model that *ONLY* had access to the 'prompt' (tabular data) and *DID NOT* see any images.
+      Your task is to quantify the extent to which the 'response' makes inappropriate visual claims (descriptions implying visual observation like colors, light, specific textures, aesthetics) that are not supported by the 'prompt' data.
+      Use the 'reference' text (written by a human who likely saw the property) as a guide to:
+      1. Understand what actual visual details the property might have (to help gauge the severity/specificity of fabrications).
+      2. Differentiate between common stylistic visual phrasing in the domain and outright fabrication of specific visual 'facts' by the 'response'.
+      A HIGH score on this metric means the model fabricated MANY/SPECIFIC visual details (which is BAD for a tabular-only model). A LOW score means it appropriately AVOIDED fabricating visual details (which is GOOD for a tabular-only model).
+    input_variables: ["prompt", "reference", "response"]
+    metric_definition: "This metric quantifies the degree of visual fabrication or hallucination in descriptions generated by a model with access only to tabular ('prompt') data. It identifies and scores the inappropriateness of visual language not supported by the input. For a tabular-only model, a lower score on this metric is better, indicating it correctly refrained from inventing visual details."
+    evaluation_steps:
+      step_1: "Acknowledge that the 'response' was generated *without visual input*, based only on the 'prompt' (tabular data)."
+      step_2: "Read the 'prompt' to understand the factual, non-visual information available to the model."
+      step_3: "Read the 'reference' text to understand legitimate visual characteristics of the property and the typical style of describing them. This provides context for what might be a plausible vs. fabricated visual detail if the 'response' invents one."
+      step_4: "Carefully read the 'response'. Identify any words, phrases, or sentences that describe or imply visual aspects of the property."
+      step_5: "For each visual claim identified in the 'response':
+                a. Determine if it is explicitly supported by information in the 'prompt'.
+                b. If not supported by the 'prompt', it's an 'unsupported visual claim'. Assess its specificity (e.g., 'beautiful view' vs. 'view of the serene canal with houseboats') and how much it implies direct visual observation."
+      step_6: "Compare these 'unsupported visual claims' in the 'response' with the visual information in the 'reference' text to gauge the nature of the fabrication. Is it inventing details wholesale, or over-embellishing in a common stylistic way (though still ungrounded from 'prompt')?"
+      step_7: "Based on the quantity, specificity, and boldness of 'unsupported visual claims' in the 'response', assign a rating from 1 to 5 using the 'rating_rubric'. Remember, a high score indicates a high level of undesirable visual fabrication for this tabular-only model."
+ 
+  - name: "stylistic_appropriateness_engagement_v3"
+    description: "Evaluates if the language in the 'response' (must be prose) is highly engaging, persuasive, and stylistically exceptional for real estate listings. Penalizes 'boring but correct' text. Uses the 'reference' as a benchmark."
+    criteria:
+      is_marketing_prose: "The 'response' is a prose narrative crafted for marketing a property, not a data dump or mere factual list." # NEW/MODIFIED
+      professional_real_estate_tone: "The 'response' consistently uses a tone and vocabulary that are highly effective and appropriate for marketing real estate."
+      persuasive_and_compelling_language: "The 'response' employs strong persuasive techniques, benefit-driven language, and vivid descriptions that actively capture interest and create desire."
+      stylistic_flair_and_originality: "The 'response' demonstrates stylistic skill, potentially including creative phrasing or a compelling narrative, avoiding overly clichéd or generic language."
+      overall_marketing_impact: "The language and style contribute significantly to a powerful and positive marketing message."
+    rating_rubric:
+      "5": "(Excellent) Exceptional marketing prose; demonstrates outstanding acumen. Language is vivid, highly persuasive, and stylistically sophisticated, likely exceeding a typical strong 'reference' text in overall impact and appeal."
+      "4": "(Good) Strong marketing prose; very engaging and professionally toned, using effective persuasive language and good descriptive detail. Clearly a high-quality marketing text, comparing favorably with or often exceeding the quality of the 'reference' text."
+      "3": "(Average) Acceptable prose, meets basic professional standards but lacks significant persuasive power or stylistic flair. Language is clear but largely generic, uninspired, or 'boring even if correct'. May be comparable in quality to an average, unexceptional 'reference' text."
+      "2": "(Fair) Weak prose; minimally engaging or persuasive. Tone may be flat, language overly simple/clichéd. May be technically correct but fails as effective marketing copy (i.e., 'boring but correct' falls here if not a 3). Noticeably less effective than a typical 'reference'."
+      "1": "(Poor) Inadequate; Fails to be appropriate marketing prose (e.g., is a data dump, not narrative) OR, if prose, tone is inappropriate, language is unengaging, unprofessional, or confusing. Fails significantly as marketing copy."
+    instruction: |
+      You are a Senior Marketing Editor for a premier real estate portal. Evaluate the 'response' for its stylistic excellence and effectiveness as marketing copy.
+      **CRITICAL FIRST CHECK: The 'response' MUST be a natural language prose description suitable for marketing a property.** If it is primarily structured data (e.g., JSON), a mere list of facts without narrative, or otherwise not marketing prose, it automatically fails the 'is_marketing_prose' criterion and should receive an overall score of 1.
+      If it IS marketing prose, then assess its quality.
+      **PENALTY FOR 'BORING BUT CORRECT':** A response that is merely a list of facts, even if accurate and grammatically correct, lacks marketing appeal. Such 'boring but correct' text should not score above a 2 or a low 3 on this metric, as it fails on engagement and persuasiveness.
+      Use the 'reference' text as a benchmark for typical quality and persuasiveness. A 'response' merely adequate or similar to an average human attempt should score around a 3. To earn a 4 or 5, it must demonstrate clear superiority in marketing impact.
+    input_variables: ["prompt", "reference", "response"] # Prompt for context on available info
+    metric_definition: "Assesses the 'response' as marketing copy. It must first be appropriate prose. Then, it evaluates style, tone, persuasiveness, and engagement against a high standard, using 'reference' as a benchmark. 'Boring but correct' prose is penalized."
+    evaluation_steps:
+      step_0: "Initial Format Check: Is the 'response' a natural language prose description suitable for marketing a property (not JSON, code, or a simple data list)?
+                - If NO, assign Score 1, comment 'Format Failure: Not marketing prose', and STOP.
+                - If YES, proceed to Step 1."
+      step_1: "Review the 'reference' text to benchmark typical tone, persuasiveness, and marketing impact."
+      step_2: "Read the 'response', considering 'prompt' for context on available information."
+      step_3: "Assess 'professional_real_estate_tone': Is the tone effective for marketing (positive, inviting, trustworthy)?"
+      step_4: "Assess 'persuasive_and_compelling_language': Does it use vivid descriptions, benefit-driven language? Does it create desire?"
+      step_5: "Assess 'stylistic_flair_and_originality': Is it creative? Does it avoid being generic or clichéd?"
+      step_6: "Assess 'overall_marketing_impact': Does it effectively 'sell' the property?"
+      step_7: "Consider the 'boring but correct' penalty: If the text is factually sound but lacks marketing appeal, ensure the score reflects this (typically 2 or low 3)."
+      step_8: "Comparing against the 'reference' benchmark and all criteria, assign a rating from 1 to 5 using the 'rating_rubric'."
+ 
+  - name: "prompt_adherence_structure"
+    description: "Assesses how well the 'response' (generated description) adheres to any explicit structural instructions, formatting requests, or constraints provided in the 'prompt' (model input data)."
+    criteria:
+      structural_compliance: "If the 'prompt' specified a particular output structure (e.g., section headings, order of information), the 'response' follows it."
+      constraint_fulfillment: "If the 'prompt' included specific constraints (e.g., 'max 100 words,' 'start with neighborhood description,' 'do not mention price'), the 'response' respects them."
+    rating_rubric:
+      "5": "(Very good) Perfectly adheres to all structural instructions and constraints from the 'prompt'."
+      "4": "(Good) Adheres to most significant structural instructions/constraints; any deviation is minor and doesn't impact overall intent."
+      "3": "(Average) Follows some structural instructions/constraints but clearly violates others, or adherence is inconsistent."
+      "2": "(Poor) Largely ignores or fails to follow most structural instructions/constraints from the 'prompt'."
+      "1": "(Very poor) Completely disregards all structural instructions and constraints from the 'prompt'."
+    instruction: "You are an evaluator checking for compliance with instructions. Your task is to assess if the 'response' (generated property description) follows the specific structural or formatting guidelines that were provided in the 'prompt' (input to the generation model). Do *not* use the 'reference' text for this evaluation, as it was not generated based on this specific 'prompt'."
+    input_variables: ["prompt", "response"]
+    metric_definition: "This metric measures the model's ability to follow explicit instructions regarding the format, structure, or content constraints of the output, as defined in the 'prompt' it received."
+    evaluation_steps:
+      step_1: "Carefully examine the 'prompt' to identify any explicit instructions regarding output structure (e.g., required sections, order of topics), formatting (e.g., use of bullet points), or content constraints (e.g., length limits, topics to include/exclude)."
+      step_2: "Read the 'response' (generated description)."
+      step_3: "Compare the structure and content of the 'response' against the instructions identified in step 1."
+      step_4: "Note every instance where the 'response' deviates from or fails to meet a specified structural instruction or constraint."
+      step_5: "Based on the degree of adherence, assign a rating from 1 to 5 using the 'rating_rubric'. Consider both the number and significance of any deviations."
+
+  - name: "linguistic_quality_structure_v4"
+    description: "Assesses fundamental linguistic quality of the 'response' (must be prose), prioritizing clarity, fluency, coherence, and logical organization, while being tolerant of isolated, minor grammatical imperfections that do not impede understanding."
+    criteria:
+      is_natural_prose_description: "The 'response' is primarily a natural language prose description suitable for a real estate listing, not structured data, code, or disconnected phrases."
+      clarity_precision_and_flow: "Language is clear, precise, and easy to understand. Sentences flow smoothly and naturally, without awkward phrasing that impedes readability." # MERGED & REPHRASED
+      coherence_and_logical_organization: "The 'response' is well-organized, with ideas presented in a logical order and clear connections between sentences and paragraphs."
+      grammatical_soundness: "The 'response' is largely free of distracting grammatical errors, punctuation, or spelling mistakes that affect comprehension or professionalism." # NEW, de-emphasized
+    rating_rubric:
+      "5": "(Very good) Natural prose that is exceptionally clear, fluent, and coherent. Virtually error-free grammatically. Ideas are perfectly structured. Very easy and pleasant to read." # MODIFIED
+      "4": "(Good) Natural prose that is clear, fluent, and coherent. May have very minor, isolated grammatical slips or slight awkwardness that don't impede understanding or flow significantly."
+      "3": "(Average) Natural prose that is generally understandable but may have some noticeable issues with clarity, flow, or organization. Some grammatical errors might be present but don't make the text largely incomprehensible." # MODIFIED
+      "2": "(Poor) Natural prose with frequent issues in clarity, fluency, or coherence. Distracting grammatical errors are common. Difficult to follow."
+      "1": "(Very poor) Fails to form a coherent natural language prose narrative (e.g., data dump) OR, if prose, is riddled with distracting errors, very unclear, and incoherent."
+    instruction: |
+      You are a language quality assurance specialist. Your task is to evaluate the 'response' for its fundamental linguistic qualities.
+      **CRITICAL FIRST CHECK: The 'response' MUST be a natural language prose description intended for human readers.** If it is primarily structured data (like JSON), code, or otherwise not a prose narrative, it automatically fails 'is_natural_prose_description' and MUST receive an overall score of 1.
+      If it IS prose, evaluate its clarity, flow, coherence, logical organization, and overall grammatical soundness. The emphasis is on clear communication and readability; isolated minor grammatical errors that don't affect understanding are less critical than issues with clarity, flow, or coherence. Do *not* consider its factual accuracy or marketing style.
+    input_variables: ["response"]
+    metric_definition: "This metric evaluates the fundamental linguistic quality of generated text, ensuring it's appropriate prose and then assessing clarity, flow, coherence, organization, and grammatical soundness, with an emphasis on overall readability over strict grammatical perfection."
+    evaluation_steps:
+      step_0: "Initial Format Check: Examine the 'response'. Is it a natural language prose description?
+                - If NO, assign Score 1, comment 'Format Failure: Not a prose description', and STOP.
+                - If YES, proceed to Step 1."
+      step_1: "If prose, read the 'response' carefully."
+      step_2: "For 'clarity_precision_and_flow': Is the language unambiguous? Is meaning conveyed effectively? Do sentences flow naturally?"
+      step_3: "For 'coherence_and_logical_organization': Are ideas in logical sequence? Is it well-structured?"
+      step_4: "For 'grammatical_soundness': Are there grammatical, punctuation, or spelling errors? If so, how much do they distract from or impede understanding?"
+      step_5: "Based on overall linguistic quality, emphasizing clarity, flow, and coherence (and contingent on passing Step 0), assign a rating from 1 to 5 using the 'rating_rubric'."
+ 
+  - name: "content_effectiveness_impression_v2"
+    description: "Evaluates the 'response' (must be prose) for its conciseness, relevance, engagement, and overall perceived quality/trustworthiness as effective real estate marketing content. Penalizes 'boring but correct' text. Uses 'reference' for context."
+    criteria:
+      is_marketing_prose: "The 'response' is a prose narrative crafted for marketing a property, not a data dump or mere factual list."
+      relevance_and_conciseness: "The 'response' focuses on highly relevant information for a property listing and is appropriately concise, avoiding fluff. Information density is effective."
+      general_engagement_and_appeal: "The 'response' is interesting to read and presents the property in an appealing, benefit-oriented way, avoiding dullness without resorting to excessive hype."
+      overall_helpfulness_professionalism_and_trustworthiness: "The 'response' provides a helpful, professional overview that feels credible and trustworthy, creating a positive overall impression. (Assumes factual accuracy is handled by other metrics)."
+    rating_rubric:
+      "5": "(Excellent) Content is exceptionally relevant, optimally concise, and highly engaging. Conveys strong trustworthiness and leaves an outstanding overall impression. Clearly superior in effectiveness to a typical 'reference'."
+      "4": "(Good) Content is mostly relevant, concise, and engaging. Trustworthy and leaves a good overall impression. Effectiveness is comparable to or better than a typical 'reference'."
+      "3": "(Average) Acceptable prose that meets basic expectations. Content is generally relevant but may have minor issues with conciseness or engagement (e.g., 'boring but correct' in parts, somewhat uninspired). Effectiveness is similar to an average 'reference' or slightly below."
+      "2": "(Fair) Weak as marketing content. Contains noticeable irrelevant/verbose parts, or is largely unengaging/dull (e.g., primarily 'boring but correct'). Feels somewhat unhelpful or less trustworthy. Noticeably less effective than an average 'reference'."
+      "1": "(Poor) Inadequate. Fails to be effective marketing prose (e.g., is a data dump/not narrative) OR, if prose, content is largely irrelevant, rambling, dull, or lacks credibility. Leaves a very negative impression."
+    instruction: |
+      You are an overall content quality assessor for a real estate platform. Evaluate the 'response' for its effectiveness as marketing copy.
+      **CRITICAL FIRST CHECK: The 'response' MUST be a natural language prose description suitable for marketing a property.** If it is primarily structured data (e.g., JSON), a mere list of facts without narrative, or otherwise not marketing prose, it automatically fails the 'is_marketing_prose' criterion and should receive an overall score of 1.
+      If it IS marketing prose, then assess its effectiveness.
+      **PENALTY FOR 'BORING BUT CORRECT':** A response that is merely a list of facts, even if accurate and grammatically sound, lacks marketing effectiveness. Such 'boring but correct' text should not score above a 2 or a low 3 on this metric, as it fails on engagement and appeal.
+      Use the 'reference' text as a general guide for what constitutes effective and high-quality content in this domain. A 'response' merely adequate or similar to an average human attempt should score around a 3. To earn a 4 or 5, it must demonstrate clear superiority in conveying value and appeal.
+    input_variables: ["prompt", "reference", "response"] # Prompt for context on information model had to make effective
+    metric_definition: "This metric provides a holistic assessment of the generated content's practical value and marketing appeal. It first ensures appropriate prose format, then considers relevance, conciseness, engagement, and overall impression of quality and trustworthiness, using 'reference' as a benchmark. 'Boring but correct' text is penalized."
+    evaluation_steps:
+      step_0: "Initial Format Check: Is the 'response' a natural language prose description suitable for marketing a property (not JSON, code, or a simple data list)?
+                - If NO, assign Score 1, comment 'Format Failure: Not marketing prose', and STOP.
+                - If YES, proceed to Step 1."
+      step_1: "Review the 'reference' text to understand the expected level of detail, conciseness, engagement, and overall quality for effective property descriptions in this context."
+      step_2: "Read the 'response', considering the 'prompt' for context on the information available to the model."
+      step_3: "For 'relevance_and_conciseness': Assess if the information presented is pertinent to a property listing and effectively prioritized. Is it to the point, or does it include unnecessary details or waffle? Is information density good?"
+      step_4: "For 'general_engagement_and_appeal': Evaluate if the description is interesting and appealing. Does it highlight benefits? Does it avoid being bland or overly factual to the point of dryness?"
+      step_5: "For 'overall_helpfulness_professionalism_and_trustworthiness': Consider the holistic impression. Does it feel like a reliable, professional, and useful summary that instills confidence?"
+      step_6: "Apply 'boring but correct' penalty: If the text is factually sound but lacks marketing appeal (engagement, persuasiveness), ensure the score reflects this (typically 2 or low 3)."
+      step_7: "Considering all these aspects and using the 'reference' as a contextual benchmark, assign a rating from 1 to 5 using the 'rating_rubric'."
+ 
+  - name: "holistic_description_quality_v3"
+    description: "Provides a comprehensive assessment of the overall quality of the 'response' (must be prose). Prioritizes clarity, flow, effective structure, content relevance, engagement, and trustworthiness, while being tolerant of minor, non-distracting grammatical imperfections. Penalizes 'boring but correct' text. Uses 'reference' for benchmarking."
+    criteria:
+      is_effective_prose_description: "The 'response' is a well-structured, natural language prose description appropriate for a real estate listing."
+      clarity_fluency_and_linguistic_soundness: "Language is exceptionally clear, precise, and flows with outstanding naturalness. Free of distracting grammatical errors or awkward phrasing. Highly readable." # MODIFIED
+      coherence_and_logical_organization: "Demonstrates perfect coherence; ideas are logically and seamlessly interconnected. Structure is highly effective."
+      relevance_conciseness_and_informativeness: "Content is highly relevant, perfectly concise, avoiding redundancy, and optimally informative."
+      engagement_appeal_and_persuasiveness: "Exceptionally engaging and appealing, using persuasive language that effectively highlights attractiveness."
+      overall_helpfulness_professionalism_and_trustworthiness: "Creates an outstanding overall impression of being extremely helpful, highly professional, and entirely trustworthy."
+    rating_rubric:
+      "5": "(Exceptional) Flawless and effective natural prose that excels across ALL criteria. Language is exceptionally clear, fluid, and virtually error-free. Structure, content, and engagement are outstanding. Truly a model example." # MODIFIED
+      "4": "(Very Good) Excellent natural prose, strong on most criteria. Language is clear, fluent, with at most trivial/non-distracting imperfections. May have one very minor weakness in another single criterion. Still a high-quality, very effective description." # MODIFIED
+      "3": "(Good/Acceptable) Generally sound and effective prose. Language is clear and understandable despite potential minor grammatical or stylistic weaknesses that don't significantly impede comprehension. May be 'correct but uninspired' or 'boring'. Useful and professional but not exceptional." # MODIFIED
+      "2": "(Fair) Prose with multiple distinct weaknesses OR significant issues in one or two key areas (e.g., noticeable clarity/flow issues, or relevant but unengaging content). Effectiveness is clearly compromised."
+      "1": "(Poor) Fundamentally fails as a quality property description. Is not appropriate prose (e.g., data dump) OR, if prose, has major problems across multiple critical criteria (distracting errors, unclear, unengaging, untrustworthy)." # MODIFIED
+    instruction: |
+      You are a Chief Editor evaluating a property description ('response') for overall excellence. This is a holistic assessment.
+      **CRITICAL FIRST CHECK: The 'response' MUST be a natural language prose description suitable for a property listing.** If not (e.g., JSON, code, data list), it automatically fails the 'is_effective_prose_description' criterion and MUST receive an overall score of 1.
+      If it IS prose, evaluate all aspects: clarity, fluency, logical structure, content effectiveness (relevance, conciseness, engagement), and overall impression (helpfulness, professionalism, trustworthiness). While major or distracting grammatical errors are penalized, the primary focus for language is on exceptional clarity and natural flow.
+      **STANDARD FOR HIGH SCORES & 'BORING BUT CORRECT' PENALTY:** The standard for a '5' is excellence across all criteria. Any significant doubt or clear imperfection drops the score. A description that is merely factually accurate and largely error-free but lacks engagement, persuasive elements, or vividness (i.e., is 'boring but correct') should not score above a '2' or a low '3' in this holistic assessment.
+      Use the 'reference' text as a benchmark for typical good quality; an exceptional 'response' (score 5) would likely be clearly superior.
+    input_variables: ["reference", "response"]
+    metric_definition: "This holistic metric assesses overall excellence. It requires appropriate prose format, then synthesizes clarity, fluency, structure, content effectiveness, engagement, and impression into a single score, with less emphasis on minor grammatical perfection if clarity and flow are maintained. Applies a very strict standard for top scores and penalizes 'boring but correct' text."
+    evaluation_steps:
+      step_0: "Initial Format Check: Is the 'response' a natural language prose description suitable for a property listing?
+                - If NO, assign Score 1, comment 'Format Failure: Not a prose description', and STOP.
+                - If YES, proceed to Step 1."
+      step_1: "Review 'reference' to calibrate for typical good quality."
+      step_2: "Thoroughly analyze the 'response'."
+      step_3: "Evaluate 'clarity_fluency_and_linguistic_soundness': Is the language exceptionally clear and precise? Does it flow naturally and engagingly? Are there any grammatical errors or awkward phrases that *distract the reader or obscure meaning*?" # MODIFIED
+      step_4: "Evaluate 'coherence_and_logical_organization': Perfect and effective?"
+      step_5: "Evaluate 'relevance_conciseness_and_informativeness': Optimal and highly relevant?"
+      step_6: "Evaluate 'engagement_appeal_and_persuasiveness': Exceptionally engaging and persuasive?"
+      step_7: "Evaluate 'overall_helpfulness_professionalism_and_trustworthiness': Outstanding impression?"
+      step_8: "Apply 'boring but correct' consideration: If the text has sound linguistics/facts but fails significantly on engagement/persuasiveness (steps 6 & 7), ensure the score is appropriately low (typically 2 or low 3)."
+      step_9: "Based on a stringent assessment across ALL criteria (including passing Step 0), apply the 'rating_rubric'. A '5' requires excellence in every aspect, with particular emphasis on clarity, flow, and effectiveness over minor grammatical perfection."
