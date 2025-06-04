@@ -11,14 +11,8 @@ import gc
 
 
 # Download NLTK resources if needed
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
-try:
-    nltk.data.find('corpora/wordnet')
-except LookupError:
-    nltk.download('wordnet')
+nltk.download('punkt_tab')
+nltk.download('wordnet')
 
 
 def evaluate_model(model, tokenizer, val_dataset, model_device,collate_fn, batch_size=4, max_gen_length=2000, num_samples=None ):
