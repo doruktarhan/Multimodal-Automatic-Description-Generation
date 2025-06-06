@@ -1,4 +1,5 @@
 import json
+import yaml
 import os
 import textwrap
 from pathlib import Path
@@ -9,34 +10,42 @@ from qwen_vl_utils import process_vision_info
 from typing import List, Dict, Any
 
 class PropertyAnalysisPipeline:
-    def __init__(self, model_path: str = "Qwen/Qwen2.5-VL-7B-Instruct"):
+    def __init__(self, config_file: str = "Image_Test_QwenVL/config.yaml"):
         """
         Initialize the property analysis pipeline with Qwen 2.5 VL model
         """
+        # Load configuration
+        self.config = self.load_config(config_file)
+        
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"Using device: {self.device}")
         
-        # Load model and processor with conditional flash attention
+        # Load model and processor
         model_kwargs = {
             "torch_dtype": torch.bfloat16 if torch.cuda.is_available() else torch.float32,
             "device_map": "auto" if torch.cuda.is_available() else None,
         }
         
-        # Only add flash_attention_2 if CUDA is available (not on Mac)
-        if torch.cuda.is_available():
-            model_kwargs["attn_implementation"] = "flash_attention_2"
-        
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-            model_path,
+            self.config["model"]["model_path"],
             **model_kwargs
         )
         
-        self.processor = AutoProcessor.from_pretrained(model_path)
+        self.processor = AutoProcessor.from_pretrained(self.config["model"]["model_path"])
+    
+    def load_config(self, config_file: str) -> Dict[str, Any]:
+        """
+        Load configuration from YAML file
+        """
+        with open(config_file, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        return config
         
-    def load_property_metadata(self, property_name: str, metadata_file: str = "property_data.json") -> Dict[str, Any]:
+    def load_property_metadata(self, property_name: str) -> Dict[str, Any]:
         """
         Load property metadata from JSON file
         """
+        metadata_file = self.config["paths"]["metadata_file"]
         with open(metadata_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
@@ -51,12 +60,13 @@ class PropertyAnalysisPipeline:
         return {}
     
     def load_property_images(self, property_name: str, photo_indices: List[int], 
-                           resolution: str = "360x240", base_path: str = "./properties") -> List[Image.Image]:
+                           resolution: str) -> List[Image.Image]:
         """
         Load property images based on indices
         """
         images = []
         property_name_normalized = property_name.replace(" ", "_")
+        base_path = self.config["paths"]["base_path"]
         property_path = Path(base_path) / property_name_normalized / resolution
         
         for idx in photo_indices:
@@ -71,48 +81,39 @@ class PropertyAnalysisPipeline:
         return images
     
     def generate_chat_template(self, item: dict) -> dict[str, str]:
-        system_prompt = (
-            "You are an expert real estate copywriter located in Amsterdam. Your task is to create a single, "
-            "compelling, and informative property description based on the provided metadata. "
-            "Your main goal is to engage potential buyers or renters and highlight what makes the property attractive.\n\n"
-            "Use the metadata as your factual basis. You have creative freedom in how you structure the description, "
-            "the language you use, and the aspects you choose to emphasize to best showcase the property and its "
-            "location (if neighborhood information is provided in the metadata).\n\n"
-            "Aim for a professional, positive, and persuasive tone. Ensure the core factual details from the metadata "
-            "(like number of rooms, essential features) are naturally woven into your narrative. Avoid inventing "
-            "specific measurements or highly unique amenities if they are not mentioned in the metadata."
-        )
+        system_prompt = self.config["prompts"]["system_prompt"]
         
-        raw_user = f"""
-        Property name: {item.get('property_name', 'N/A')}
-        Neighbourhood: {item.get('neighborhood', 'N/A')}
-
-        FEATURES JSON:
-        {json.dumps(item.get('features', {}), indent=2)}
-
-        Write a compelling property description that highlights the main features and benefits below.
-        """
-
-        user_prompt = textwrap.dedent(raw_user).strip()
+        user_prompt = self.config["prompts"]["user_prompt_template"].format(
+            property_name=item.get('property_name', 'N/A'),
+            neighborhood=item.get('neighborhood', 'N/A'),
+            features_json=json.dumps(item.get('features', {}), indent=2)
+        )
 
         return {"system_prompt": system_prompt, "user_prompt": user_prompt}
     
-    def analyze_property(self, property_name: str, photo_indices: List[int], 
-                        resolution: str = "360x240", base_path: str = "./properties", 
-                        metadata_file: str = "property_data.json") -> str:
+    def analyze_property(self, property_name: str = None, photo_indices: List[int] = None, 
+                        resolution: str = None) -> str:
         """
         Analyze property using images and metadata
         """
+        # Use config defaults if parameters not provided
+        if property_name is None:
+            property_name = self.config["test_settings"]["property_name"]
+        if photo_indices is None:
+            photo_indices = self.config["test_settings"]["photo_indices"]
+        if resolution is None:
+            resolution = self.config["test_settings"]["resolution"]
+        
         # Load property data
         print(f"Loading metadata for property: {property_name}")
-        property_data = self.load_property_metadata(property_name, metadata_file)
+        property_data = self.load_property_metadata(property_name)
         
         # Generate chat template
         chat_template = self.generate_chat_template(property_data)
         
         # Load images
         print(f"Loading images: {photo_indices}")
-        images = self.load_property_images(property_name, photo_indices, resolution, base_path)
+        images = self.load_property_images(property_name, photo_indices, resolution)
         
         if not images:
             return "No valid images found for analysis"
@@ -151,6 +152,10 @@ class PropertyAnalysisPipeline:
             messages, tokenize=False, add_generation_prompt=True
         )
         
+        # Debug: save input text
+        with open(f"debug_input_{property_name.replace(' ', '_')}.txt", "w", encoding="utf-8") as f:
+            f.write(text)
+        
         image_inputs, video_inputs = process_vision_info(messages)
         inputs = self.processor(
             text=[text],
@@ -163,7 +168,7 @@ class PropertyAnalysisPipeline:
         
         # Generate response
         print("Generating analysis...")
-        generated_ids = self.model.generate(**inputs, max_new_tokens=1024)
+        generated_ids = self.model.generate(**inputs, max_new_tokens=4000)
         generated_ids_trimmed = [
             out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
         ]
@@ -171,29 +176,28 @@ class PropertyAnalysisPipeline:
             generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )
         
+        # Debug: save output text
+        with open(f"debug_output_{property_name.replace(' ', '_')}.txt", "w", encoding="utf-8") as f:
+            f.write(output_text[0])
+        
         return output_text[0]
 
 def test_pipeline():
     """
     Test the property analysis pipeline
     """
-    # Initialize pipeline
+    # Initialize pipeline (reads from config.yaml)
     pipeline = PropertyAnalysisPipeline()
     
-    # ===== INPUT PARAMETERS - MODIFY THESE =====
-    property_name = "Dufaystraat 7-2"  # Change this to your property name
-    photo_indices = [1, 3, 5, 8, 10]   # Change this to your photo numbers
-    resolution = "360x240"              # Choose: "180x120" or "360x240"
-    # ==========================================
+    # Run analysis using config settings
+    result = pipeline.analyze_property()
     
-    # Run analysis
-    result = pipeline.analyze_property(
-        property_name=property_name,
-        photo_indices=photo_indices,
-        resolution=resolution,
-        base_path="./funda_images",
-        metadata_file="Synthe_Loc_New/final_data_similar_filtered_synth_loc_added.json"
-    )
+    # Or override specific parameters
+    # result = pipeline.analyze_property(
+    #     property_name="Different Property",
+    #     photo_indices=[2, 4, 6],
+    #     resolution="180x120"
+    # )
     
     print("="*50)
     print("ANALYSIS RESULT:")

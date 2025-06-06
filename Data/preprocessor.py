@@ -1,6 +1,6 @@
 #preprocessor.py
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import textwrap
 
 class Preprocessor:
@@ -14,46 +14,75 @@ class Preprocessor:
         """
 
 
-    def generate_prompt(self, item: Dict[str, Any]) -> str:
-        features = item.get('features', {})
-        neighborhood = item.get('neighborhood', 'N/A')
-        property_name = item.get('property_name', 'N/A')
-        
-        prompt = f"""You are a real estate agent writing a property description for {property_name} in {neighborhood}, Amsterdam. Your job is to create a property description using the provided metadata for the property. 
+    # def generate_chat_template(self, item: dict) -> dict[str, str]:
+    #     system_prompt = (
+    #         "You are a real‑estate agent responsible for writing property "
+    #         "descriptions using the given metadata of the house. Write in an engaging, "
+    #         "professional tone that highlights the property's best features.\n"
+    #         "Always produce the following sections once and in this order:\n"
+    #         "1. INTRODUCTION – brief overview\n"
+    #         "2. LAYOUT – describe rooms and spaces\n"
+    #         "3. LOCATION – info about the neighbourhood (stay general unless specific details are provided)\n"
+    #         "4. SPECIAL FEATURES – bullet list of key selling points with brief value descriptions\n\n"
+    #         "Rules:\n"
+    #         "• Mention only features present in the metadata.\n"
+    #         "• Don't invent amenities, locations or measurements if not mentioned in te tabular data.\n"
+    #         "• You may use descriptive adjectives for verified features (e.g., 'spacious' for large areas).\n"
+    #         "• Start your answer after the literal text “PROPERTY DESCRIPTION:” "
+    #         "and begin with “INTRODUCTION: ”."
+    #     )
 
-    Create a professional property description with these sections:
-    1. INTRODUCTION - Brief overview of the property
-    2. LAYOUT - Description of the rooms and spaces
-    3. LOCATION - Information about the {neighborhood} area
-    4. SPECIAL FEATURES - Bullet list of key selling points, not all features.
+    #     raw_user = f"""
+    #     Property name: {item.get('property_name', 'N/A')}
+    #     Neighbourhood: {item.get('neighborhood', 'N/A')}
 
-    PROPERTY DETAILS:
-    {json.dumps(features, indent=2)}
+    #     FEATURES JSON:
+    #     {json.dumps(item.get('features', {}), indent=2)}
 
-    Rules: Only mention features in the data. Don't invent amenities, locations, or claim proximity to areas not mentioned. Be accurate about room counts and measurements.
-    You need to have exactly 1 of each sections. Start description after "PROPERTY DESCRIPTION: with "INTRODUCTION: "
+    #     Write a compelling property description that highlights the main features and benefits below.
+    #     """
 
-    PROPERTY DESCRIPTION: 
-    """
-        return prompt
-    
+    #     user_prompt = textwrap.dedent(raw_user).strip()
+
+    #     return {"system_prompt": system_prompt, "user_prompt": user_prompt}
+
+
+################################## LESS RESTRICTED PROMPT ##########################################################################
+##############################################################################################################################
 
     def generate_chat_template(self, item: dict) -> dict[str, str]:
-        system_prompt = (
-            "You are a real‑estate agent responsible for writing property "
-            "descriptions using the given metadata of the house.\n"
-            "Always produce the following sections once and in this order:\n"
-            "1. INTRODUCTION – brief overview\n"
-            "2. LAYOUT – describe rooms and spaces\n"
-            "3. LOCATION – info about the neighbourhood\n"
-            "4. SPECIAL FEATURES – bullet list of key selling points\n\n"
-            "Rules:\n"
-            "• Mention only features present in the metadata.\n"
-            "• Don’t invent amenities, locations or measurements if not necessary.\n"
-            "• Start your answer after the literal text “PROPERTY DESCRIPTION:” "
-            "and begin with “INTRODUCTION: ”."
-        )
 
+        system_prompt = (
+            "You are a skilled real-estate copywriter. Your primary goal is to craft a professional, engaging, and "
+            "vivid property description using the provided metadata. Aim to highlight the property's best features "
+            "and its overall appeal to potential buyers or renters, making the most of the information available.\n\n"
+            "Always produce the following sections once and in this order:\n"
+            "1. INTRODUCTION – Provide a concise and inviting overview of the property, capturing its essence and key appeal based on the metadata.\n"
+            "2. LAYOUT – Clearly describe the rooms, spaces, and their arrangement as detailed in the metadata. Use descriptive language to "
+            "   convey their atmosphere and functionality, elaborating on the listed features.\n"
+            "3. LOCATION – Detail the property's location and neighborhood character *based on the 'Neighbourhood' information "
+            "   and any related location details explicitly provided in the metadata*. If specific neighborhood amenities or "
+            "   characteristics are listed in the metadata, elaborate on these to showcase their benefits. If the provided neighborhood "
+            "   data is general or minimal, focus on describing the property's setting (e.g., 'situated in a residential area,' "
+            "   'urban apartment living') as supported by the input, or its general accessibility if such information is available.\n"
+            "4. SPECIAL FEATURES – Present a bulleted list of notable selling points taken directly from the metadata. For each point, "
+            "   briefly explain its value or benefit to enhance its attractiveness, using the provided details as your foundation.\n\n"
+            "Guidelines for Content Generation:\n"
+            "• Adherence to Metadata: Ensure that all factual claims (number of rooms, sizes, specific amenities like 'garage', 'balcony', "
+            "  energy labels, year built) are directly and accurately supported by the provided metadata.\n"
+            "• Engaging and Descriptive Language: You are strongly encouraged to use rich adjectives, professional vocabulary, and "
+            "  descriptive phrasing to make the *features and details explicitly mentioned in the metadata* sound appealing and to "
+            "  vividly convey a sense of the property's atmosphere and benefits. For example, if the metadata lists a 'garden', "
+            "  you can describe it as 'a delightful garden space, perfect for outdoor relaxation.'\n"
+            "• Professional Tone: Maintain a professional, clear, positive, and trustworthy tone throughout the description.\n"
+            "• Avoid Inventing Specifics: Do not invent specific amenities, unique architectural details, room dimensions, "
+            "  or detailed neighborhood characteristics (like names of specific local cafes, shops, exact unlisted distances, "
+            "  or unique neighborhood events) *if they are not present in the metadata*. Your creativity should focus on "
+            "  embellishing and presenting the *provided information* in the best possible light, not on adding new, unverified 'facts'.\n"
+            "• Starting Phrase: Always start your entire answer after the literal text “PROPERTY DESCRIPTION:” "
+            "  and begin the first section with “INTRODUCTION: ” (followed by your text)."
+        )
+        
         raw_user = f"""
         Property name: {item.get('property_name', 'N/A')}
         Neighbourhood: {item.get('neighborhood', 'N/A')}
@@ -69,31 +98,40 @@ class Preprocessor:
         return {"system_prompt": system_prompt, "user_prompt": user_prompt}
 
 
+################################## FREE ROAM PROMPT ##########################################################################
+##############################################################################################################################
 
-    def create_example(self, item: Dict[str, Any]) -> Dict[str, str]:
-        """
-        Create a single training example from a property item
+    # def generate_chat_template(self, item: dict) -> dict[str, str]:
+
+    #     system_prompt = (
+    #         "You are an expert real estate copywriter located in Amsterdam. Your task is to create a single, "
+    #         "compelling, and informative property description based on the provided metadata. "
+    #         "Your main goal is to engage potential buyers or renters and highlight what makes the property attractive.\n\n"
+    #         "Use the metadata as your factual basis. You have creative freedom in how you structure the description, "
+    #         "the language you use, and the aspects you choose to emphasize to best showcase the property and its "
+    #         "location (if neighborhood information is provided in the metadata).\n\n"
+    #         "Aim for a professional, positive, and persuasive tone. Ensure the core factual details from the metadata "
+    #         "(like number of rooms, essential features) are naturally woven into your narrative. Avoid inventing "
+    #         "specific measurements or highly unique amenities if they are not mentioned in the metadata."
+    #     )
         
-        Args:
-            item: Property data dictionary
-            
-        Returns:
-            Dictionary with input and output text
-        """
-        # Skip items without descriptions
-        if 'description' not in item or not item['description'].strip():
-            return None
-        
-        #Generate prompt
-        input_text = self.generate_prompt(item)
-        output_text = item.get('description', '')
-        
-        return {
-            "input": input_text,
-            "output": output_text
-        }
+    #     raw_user = f"""
+    #     Property name: {item.get('property_name', 'N/A')}
+    #     Neighbourhood: {item.get('neighborhood', 'N/A')}
+
+    #     FEATURES JSON:
+    #     {json.dumps(item.get('features', {}), indent=2)}
+
+    #     Write a compelling property description that highlights the main features and benefits below.
+    #     """
+
+    #     user_prompt = textwrap.dedent(raw_user).strip()
+
+    #     return {"system_prompt": system_prompt, "user_prompt": user_prompt}
+
+#######################################################################################################################
     
-    def create_chat_example(self, item: dict) -> list[dict[str, str]] | None:
+    def create_chat_example(self, item: dict) -> Optional[list[dict[str, str]]]:
         # Skip items without usable description
         desc = item.get("description", "")
         if not desc.strip():

@@ -10,6 +10,7 @@ from torch.optim import AdamW
 import gc
 import psutil
 import datetime
+import math  # Added for perplexity calculation
 
 # Import your custom modules
 from Data.custom_dataloader import CustomDataLoader
@@ -106,7 +107,7 @@ def main():
         "phi": "microsoft/phi-1_5",
         "qwen": "Qwen/Qwen1.5-1.8B-Chat",
         "qwen3b" : "Qwen/Qwen2.5-3B-Instruct",
-        "qwen7b" : "Qwen/Qwen2.5-7B",
+        "qwen7b" : "Qwen/Qwen2.5-7B-Instruct",
         "opt": "facebook/opt-1.3b",
         "gpt2": "gpt2"
     }
@@ -117,19 +118,22 @@ def main():
     print(f"Using model: {model_name} ({selected_model})")
 
 
-    data_path = "Data/train_data.json"
-    validation_data_path = "Data/test_data.json"
+    data_path = "Training_Data/Synthetic_Loc_Data/train_data.json"
+    validation_data_path = "Training_Data/Synthetic_Loc_Data/test_data.json"
    
+
 
     # Training hyperparams - testing all 30 samples
     stream_chunk_size = 1024     # Load 10 samples at a time
-    micro_batch_size = 2      # Train one sample at a time
+    micro_batch_size = 1      # Train one sample at a time
+    validation_batch_size = micro_batch_size* 2  # Larger batch size for validation (no backward pass needed)
     epochs = 5                 # Number of epochs
     max_sequence_length = 2000  # Moderate sequence length
-    learning_rate = 1e-5       # Conservative learning rate
-    quantization = 8           #select from [0,4,8] 0 for no quantization
-    gradient_accumulation_steps = 16 # update parameters after every x steps for making effective learning rate desired 
-    chunk_repeat_eval_save = 100000
+    learning_rate = 2e-6      # Conservative learning rate
+    quantization = 0            #select from [0,4,8] 0 for no quantization
+    gradient_accumulation_steps = 32 # update parameters after every x steps for making effective learning rate desired 
+    chunk_repeat_eval_save = 100000 #save model after each x chunk, large number indicates no saving during training. 
+
 
     # For GPU, explicitly set device_map to "auto" which should use all available GPUs
     device_map = "auto"
@@ -299,6 +303,38 @@ def main():
     print(f"Total chunks in dataset: {total_chunks}")
 
     ############### Validation Data Creation #########################
+    print("Loading validation data...")
+    val_data_loader = CustomDataLoader(validation_data_path)
+    val_data = []
+    
+    # Load all validation data at once since it's smaller (400-500 samples)
+    val_data = val_data_loader.load_all()
+    
+    print(f"Loaded {len(val_data)} validation samples")
+    
+    # Create validation dataset
+    val_preprocessor = Preprocessor()
+    val_processed_examples = val_preprocessor.process_data(val_data)
+    
+    val_dataset = RealEstateDataset.from_preprocessor(
+        raw_data=val_data,
+        preprocessor=val_preprocessor,
+        tokenizer=tokenizer,
+        max_input_length=max_sequence_length,
+        max_output_length=max_sequence_length
+    )
+    
+    print(f"Created validation dataset with {len(val_dataset)} examples")
+    
+    # Create validation DataLoader with larger batch size
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=validation_batch_size,
+        shuffle=False,
+        collate_fn=collate_fn
+    )
+    
+    print(f"Created validation DataLoader with {len(val_loader)} batches")
 
     ############################# Training loop ###################################
 
@@ -390,7 +426,10 @@ def main():
                     forward_time = time.time() - forward_start
                     print(f"Forward pass took {forward_time:.2f} seconds")
                     
-                    print(f"Loss: {loss.item():.4f}")
+                    # Calculate perplexity (exp of the loss)
+                    perplexity = math.exp(outputs.loss.item())
+                    
+                    print(f"Loss: {loss.item():.4f}, Perplexity: {perplexity:.4f}")
                     epoch_loss += loss.item() * gradient_accumulation_steps  # Record unscaled loss for reporting
                     epoch_batches += 1
                     
@@ -418,6 +457,7 @@ def main():
                     # Log metrics
                     wandb.log({
                         "batch_loss": loss.item() * gradient_accumulation_steps,  # Log unscaled loss
+                        "batch_perplexity": perplexity,  # Log perplexity
                         "sequence_length": seq_len,
                         "forward_time": forward_time,
                         "backward_time": backward_time,
@@ -451,9 +491,63 @@ def main():
         # Report epoch stats
         if epoch_batches > 0:
             avg_loss = epoch_loss / epoch_batches
-            print(f"\nEpoch {epoch+1} complete - Average loss: {avg_loss:.4f}")
+            avg_perplexity = math.exp(avg_loss)
+            print(f"\nEpoch {epoch+1} complete - Average loss: {avg_loss:.4f}, Average perplexity: {avg_perplexity:.4f}")
             print(f"Processed {epoch_batches} batches from {chunk_count} chunks")
-            wandb.log({"epoch_avg_loss": avg_loss, "epoch": epoch, "completed_chunks": chunk_count})
+            wandb.log({
+                "epoch_avg_loss": avg_loss, 
+                "epoch_avg_perplexity": avg_perplexity, 
+                "epoch": epoch, 
+                "completed_chunks": chunk_count
+            })
+        
+        # Run validation after each epoch
+        print("\n----- Running Validation -----")
+        model.eval()  # Set model to evaluation mode
+        
+        val_loss = 0.0
+        val_steps = 0
+        
+        with torch.no_grad():  # No gradient calculation during validation
+            for val_step, val_batch in enumerate(val_loader):
+                print(f"Validation batch {val_step+1}/{len(val_loader)}")
+                
+                # Move data to device
+                val_input_ids = val_batch["input_ids"].to(model_device)
+                val_attention_mask = val_batch["attention_mask"].to(model_device)
+                val_labels = val_batch["labels"].to(model_device)
+                
+                # Forward pass
+                val_outputs = model(
+                    input_ids=val_input_ids,
+                    attention_mask=val_attention_mask,
+                    labels=val_labels
+                )
+                
+                # Get loss
+                batch_val_loss = val_outputs.loss.item()
+                val_loss += batch_val_loss
+                val_steps += 1
+                
+                # Calculate and print perplexity for this batch
+                batch_val_perplexity = math.exp(batch_val_loss)
+                print(f"Validation batch loss: {batch_val_loss:.4f}, Perplexity: {batch_val_perplexity:.4f}")
+        
+        # Calculate average validation loss and perplexity
+        avg_val_loss = val_loss / val_steps if val_steps > 0 else 0
+        avg_val_perplexity = math.exp(avg_val_loss)
+        
+        print(f"Validation complete - Average loss: {avg_val_loss:.4f}, Perplexity: {avg_val_perplexity:.4f}")
+        
+        # Log validation metrics to wandb
+        wandb.log({
+            "val_loss": avg_val_loss,
+            "val_perplexity": avg_val_perplexity,
+            "epoch": epoch
+        })
+        
+        # Set model back to training mode
+        model.train()
         
         # Save model after each epoch
         epoch_dir = os.path.join(output_dir, f"epoch{epoch+1}_full")

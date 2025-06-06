@@ -24,13 +24,15 @@ from Inference.generate_samples_inference import generate_samples
 
 # -------------------- CONFIGURATION --------------------
 # Set this to True to use the base model without fine-tuning
-USE_BASE_MODEL = False  # Change this to True to use base model
+USE_BASE_MODEL = True  # Change this to True to use base model
 test_mode = True
-test_batches = 2
+test_batches = 4
+
+
 
 test_data_path = "Data/test_data.json"
-model_name = "Qwen/Qwen2.5-3B-Instruct"
-trained_model_short_path = "saved_model_qwen3b_1e-05_64_0_20250417_002746/epoch5_full"
+model_name = "Qwen/Qwen2.5-7B-Instruct"
+trained_model_short_path = "saved_model_qwen7b_2e-06_32_0_20250422_175136/epoch1_full"
 
 
 # Model paths and settings
@@ -81,7 +83,7 @@ generated_samples = generate_samples(
     tokenizer=tokenizer,
     preprocessor=preprocessor,
     test_data=data,
-    batch_size=8,
+    batch_size=4,
     max_length=1000,
     temperature=0.1,  # Doesn't matter
     top_k=50,        # Doesn't matter
