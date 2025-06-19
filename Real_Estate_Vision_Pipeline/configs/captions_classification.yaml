@@ -1,0 +1,117 @@
+# Room classification captions - using your existing caption styles
+room_captions:
+  kitchen:
+    - "a real estate photo of a kitchen"
+    - "kitchen interior with or without appliances"
+    - "empty unfurnished kitchen space"
+    - "modern equipped kitchen with cabinets and counters"
+    - "cooking area viewed from any angle"
+  
+  living_room:
+    - "a real estate photo of a living room"
+    - "living area with or without furniture"
+    - "empty unfurnished living space"
+    - "furnished living room with seating"
+    - "residential lounge or sitting area from any angle"
+  
+  bedroom:
+    - "a real estate photo of a bedroom"
+    - "sleeping room with or without bed"
+    - "empty unfurnished bedroom"
+    - "bedroom with single bed or double bed"
+    - "master bedroom or small bedroom space"
+  
+  bathroom:
+    - "a real estate photo of a bathroom"
+    - "bathroom with shower or bathtub"
+    - "toilet and sink area"
+    - "small bathroom or spacious bathroom"
+    - "bathroom viewed from doorway or inside"
+  
+  dining_room:
+    - "a real estate photo of a dining room"
+    - "dining area with or without table"
+    - "empty dining space"
+    - "eating area adjacent to kitchen"
+    - "formal or casual dining space"
+  
+  exterior:
+    - "exterior view of specific property"
+    - "front view of the building being sold"
+    - "street view showing the advertised property"
+    - "facade of the house or apartment building"
+    - "outside view of the property for sale"
+  
+  balcony:
+    - "elevated balcony with railing high above ground"
+    - "small balcony space attached to apartment"
+    - "narrow balcony with metal or glass railing"
+    - "balcony hanging off building facade"
+    - "compact outdoor balcony with city view"
+  
+  garage:
+    - "a real estate photo of a garage"
+    - "empty garage space"
+    - "garage with or without car"
+    - "single or double garage interior"
+    - "garage door open or closed"
+  
+  basement:
+    - "a photo of a basement"
+    - "lower level room or cellar"
+    - "finished or unfinished basement"
+    - "storage basement area"
+    - "underground level space"
+  
+  hallway:
+    - "long narrow corridor with doors"
+    - "hallway connecting multiple rooms"
+    - "corridor with doors on both sides"
+  
+  garden:
+    - "private garden of the property"
+    - "backyard with grass or plants"
+    - "residential garden area"
+    - "landscaped garden space"
+    - "property garden with fence or boundaries"
+  
+  home_office:
+    - "a photo of a home office"
+    - "study room or workspace in the house"
+    - "room with desk or empty office space"
+    - "small office nook or dedicated office room"
+    - "workspace area in any room"
+  
+  laundry_room:
+    - "dedicated laundry room with washer and dryer"
+    - "separate utility room for laundry only"
+    - "laundry closet with stacked washer dryer"
+  
+  stairway:
+    - "a photo of stairs"
+    - "staircase going up or down inside house"
+    - "wooden or carpeted stairs of a property"
+    - "spiral staircase or straight stairs of a property"
+    - "view from top or bottom of stairs of a property"
+  
+  floor_plan:
+    - "floor plan drawing"
+    - "architectural layout diagram"
+    - "2D property blueprint"
+    - "room arrangement schematic"
+    - "technical floor plan with measurements"
+  
+  terrace:
+    - "spacious wooden deck terrace"
+    - "large outdoor terrace with wooden flooring"
+    - "rooftop terrace with deck surface"
+    - "ground floor terrace or roof terrace"
+    - "wide terrace area with outdoor furniture space"
+  
+  outside:
+    - "random outdoor photo of a park"
+    - "street view showing other buildings"
+    - "public spaces like parks or canals"
+    - "neighborhood shops or cafes"
+    - "any outdoor area not part of this listing"
+    - "general outdoor scene without any property focus"

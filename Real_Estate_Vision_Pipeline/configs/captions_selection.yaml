@@ -1,0 +1,71 @@
+# Selection-specific captions for identifying high-quality, informative images
+# These captions focus on completeness, clarity, and real estate value
+
+selection_captions:
+  # Tier 1 - Essential rooms (3 captions each for quality diversity)
+  living_room:
+    - "A wide-angle view centered on the primary seating area, such as the sofa or couches"
+    - "A photograph of a living room that clearly shows the television area and seating arrangement together"
+    - "A spacious view of the living room, showing its connection to windows or other rooms"
+  
+  kitchen:
+    - "A wide-angle photograph of a kitchen showing the relationship between the countertops, cabinets, and major appliances"
+    - "A full view of the kitchen demonstrating its complete layout and size, often showing the floor"
+    - "A real estate photo of a kitchen showing the main cooking area and the sink in one frame"
+  
+  bedroom:
+    - "A wide-angle real estate photo of a furnished bedroom, showing the bed in relation to the windows and walls"
+    - "A clear view of the bedroom's floor space and dimensions, capturing the main sleeping area"
+    - "A bright, well-lit photograph that showcases the entire bedroom layout and available space"
+  
+  bathroom:
+    - "A wide-angle view of a bathroom showing the toilet, sink, and the shower or bathtub together"
+    - "A complete bathroom photograph showing the floor, vanity, and overall room layout"
+  
+  # Tier 2 - Important rooms (2 captions each)
+  dining_room:
+    - "A clear view of the dining area, showing the full dining table and chairs"
+    - "A photograph showing the dining room space in relation to its lighting and windows"
+  
+  exterior:
+    - "The front facade of the property, showing the main entrance and architectural style"
+    - "An exterior shot showing the building within its immediate surroundings"
+  
+  balcony:
+    - "A clear shot of the balcony showing its size, floor, and railings"
+    - "The view from the balcony, looking outwards from the property"
+  
+  terrace:
+    - "A spacious terrace showing the potential for outdoor living or seating areas"
+    - "A clear view of the entire usable space of the terrace"
+  
+  hallway:
+    - "A view down a hallway, showing the length of the corridor and doors to other rooms"
+    - "A clear hallway view showing connections between spaces"
+  
+  stairway:
+    - "A staircase showing the full flight of stairs from one level to another"
+    - "A clear view of the stairs, handrail, and landing"
+  
+  home_office:
+    - "A view of a dedicated home office space with the desk and work area visible"
+    - "A photograph of the room designated as an office, showing its size"
+  
+  # Tier 3 - Additional rooms (1 caption each)
+  garden:
+    - "A view of the garden area, showing lawn, plants, or patio space"
+  
+  garage:
+    - "The interior of the garage showing the parking space and storage capacity"
+  
+  basement:
+    - "The main area of the basement, showing its potential for storage or as a living space"
+  
+  laundry_room:
+    - "A laundry room with washer and dryer appliances visible"
+  
+  floor_plan:
+    - "A clear, legible floor plan showing the layout of rooms, including the kitchen and bedrooms"
+  
+  outside:
+    - "A view of the neighborhood, street context, or nearby properties"

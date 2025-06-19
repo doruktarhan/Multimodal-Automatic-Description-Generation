@@ -1,0 +1,22 @@
+model:
+  type: "blip"
+  model_name: "Salesforce/blip-itm-large-coco"
+  device: "cuda"
+
+data:
+  base_path: "funda_images"  # Relative to main project directory
+  resolution: "360x240"
+  batch_size: 8
+
+embeddings:
+  image_embeddings_dir: "data/embeddings/image_embeddings"
+  text_embeddings_dir: "data/embeddings/text_embeddings"  
+
+classification:
+  caption_style: "fancy"
+  aggregation: "max"  # 'max' or 'avg'
+  test_mode: false
+  test_properties: 5
+
+output:
+  classification_results: "data/results/classification"  

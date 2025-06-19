@@ -1,0 +1,103 @@
+Selection Results Metadata Description
+The selection results JSON file contains the following structure for each property:
+json{
+  "Property_Name": {
+    "property_name": "Property_Name",
+    "timestamp": "2024-01-20T15:30:00",
+    "num_images": 45,              // Total images in property
+    "num_selected": 15,            // Number of selected images
+    "selected_indices": [0, 3, 7, ...],  // Indices of selected images
+    "selected_image_paths": [      // Full paths to selected images
+      "/path/to/image_001.jpg",
+      "/path/to/image_004.jpg",
+      ...
+    ],
+    "selected_predictions": [      // Room types of selected images
+      "living_room",
+      "kitchen",
+      ...
+    ],
+    "selection_scores": [...],     // Selection quality scores for ALL images
+    "combined_scores": [...],      // Combined scores for ALL images
+    "selection_details": {
+      "tier1": {
+        "living_room": 2,
+        "bedroom": 2,
+        "kitchen": 2,
+        "bathroom": 1,
+        "dining_room": 1
+      },
+      "tier2": {
+        "balcony": 1,
+        "terrace": 0,
+        "exterior": 1
+      },
+      "tier3": {
+        "stairway": 1,
+        "hallway": 1,
+        ...
+      },
+      "excluded": {
+        "floor_plan": 3,
+        "outside": 2
+      },
+      "score_stats": {
+        "combined": {
+          "mean": 0.412,
+          "std": 0.045,
+          "min": 0.342,
+          "max": 0.487
+        },
+        "confidence": {
+          "mean": 0.418,
+          "std": 0.038,
+          "min": 0.367,
+          "max": 0.472
+        }
+      },
+      "total_selected": 15,
+      "available_rooms": ["living_room", "kitchen", ...]
+    },
+    "config": {
+      "alpha": 0.3,
+      "beta": 0.7,
+      "aggregation": "avg",
+      "tier2_threshold": 0.35,
+      "tier3_threshold": 0.40,
+      "max_images": 15
+    }
+  }
+}
+
+
+Key Fields for VLM Integration:
+
+selected_image_paths: Direct paths to the 15 selected images
+selected_predictions: Room types for context
+selected_indices: If you need to reference back to original embeddings/metadata
+
+Usage Example for VLM:
+python# Load selection results
+with open('selection_results.json', 'r') as f:
+    selection_results = json.load(f)
+
+# For each property
+for property_name, results in selection_results.items():
+    selected_images = results['selected_image_paths']
+    room_types = results['selected_predictions']
+    
+    # Feed to VLM
+    for img_path, room_type in zip(selected_images, room_types):
+        # Load image and process with VLM
+        # Include room_type as context if needed
+        pass
+Running the Pipeline:
+bash# Process only sample properties
+python Real_Estate_Vision_Pipeline/scripts/run_selection.py --classification-results Real_Estate_Vision_Pipeline/data/results/classification/classification_results_20250614_170933.json --sample-only
+
+# Process specific property
+python Real_Estate_Vision_Pipeline/scripts/run_selection.py --classification-results Real_Estate_Vision_Pipeline/data/results/classification/classification_results_20250614_170933.json --specific-property "Daan_Roodenburghplein_38"
+
+# Process all properties
+python Real_Estate_Vision_Pipeline/scripts/run_selection.py --classification-results Real_Estate_Vision_Pipeline/data/results/classification/classification_results_20250614_170933.json
+The pipeline saves results in data/results/selection/ with clear metadata for downstream VLM processing.

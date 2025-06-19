@@ -1,0 +1,37 @@
+{
+  "total_properties": 3529,
+  "total_images": 117744,
+  "overall_room_distribution": {
+    "dining_room": 8696,
+    "outside": 11118,
+    "balcony": 8032,
+    "living_room": 13155,
+    "hallway": 6320,
+    "kitchen": 9011,
+    "bedroom": 12241,
+    "bathroom": 10134,
+    "exterior": 9190,
+    "floor_plan": 12439,
+    "garage": 1597,
+    "basement": 201,
+    "garden": 1771,
+    "home_office": 2430,
+    "laundry_room": 1278,
+    "stairway": 4192,
+    "terrace": 5939
+  },
+  "confidence_statistics": {
+    "mean": 0.40554874539762564,
+    "std": 0.04098590239143268,
+    "min": 0.12563054263591766,
+    "max": 0.561505138874054
+  },
+  "images_per_property": {
+    "mean": 33.36469254746387,
+    "min": 1,
+    "max": 114
+  },
+  "processing_time_seconds": 143.5453338623047,
+  "successful_properties": 3529,
+  "failed_properties": 0
+}

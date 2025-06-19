@@ -1,0 +1,192 @@
+{
+  "thresholds": [
+    15,
+    25,
+    40,
+    60
+  ],
+  "sample_counts": [
+    2,
+    10,
+    10,
+    10,
+    3
+  ],
+  "random_seed": 42,
+  "bins": {
+    "less_than_15": {
+      "target_count": 2,
+      "actual_count": 2,
+      "properties": [
+        {
+          "name": "Zinranapad_241",
+          "num_images": 12
+        },
+        {
+          "name": "Genhoes_8",
+          "num_images": 13
+        }
+      ]
+    },
+    "between_15_25": {
+      "target_count": 10,
+      "actual_count": 10,
+      "properties": [
+        {
+          "name": "Grootslagstraat_75",
+          "num_images": 24
+        },
+        {
+          "name": "Schoolstraat_6-B",
+          "num_images": 23
+        },
+        {
+          "name": "Smitstraat_35-2",
+          "num_images": 22
+        },
+        {
+          "name": "Stolwijkstraat_49-3",
+          "num_images": 23
+        },
+        {
+          "name": "Veembroederhof_59",
+          "num_images": 23
+        },
+        {
+          "name": "Ladogameerhof_140",
+          "num_images": 24
+        },
+        {
+          "name": "Camperstraat_22-D",
+          "num_images": 25
+        },
+        {
+          "name": "Faas_Wilkesstraat_371",
+          "num_images": 18
+        },
+        {
+          "name": "Frederik_Hendrikstraat_4-2",
+          "num_images": 21
+        },
+        {
+          "name": "Beukenplein_20-2",
+          "num_images": 21
+        }
+      ]
+    },
+    "between_25_40": {
+      "target_count": 10,
+      "actual_count": 10,
+      "properties": [
+        {
+          "name": "Jacques_Veltmanstraat_241",
+          "num_images": 36
+        },
+        {
+          "name": "Kerstomaatplantsoen_17",
+          "num_images": 38
+        },
+        {
+          "name": "Rustenburgerstraat_129-2",
+          "num_images": 31
+        },
+        {
+          "name": "Daan_Roodenburghplein_38",
+          "num_images": 28
+        },
+        {
+          "name": "Vrolikstraat_294-1",
+          "num_images": 27
+        },
+        {
+          "name": "Cornelis_Krusemanstraat_11-1",
+          "num_images": 26
+        },
+        {
+          "name": "Postjeskade_199-3",
+          "num_images": 38
+        },
+        {
+          "name": "Sarphatistraat_528",
+          "num_images": 39
+        },
+        {
+          "name": "L.J.M._Beelstraat_21",
+          "num_images": 29
+        },
+        {
+          "name": "Pasteurstraat_43",
+          "num_images": 32
+        }
+      ]
+    },
+    "between_40_60": {
+      "target_count": 10,
+      "actual_count": 10,
+      "properties": [
+        {
+          "name": "Admiraal_De_Ruijterweg_111-3",
+          "num_images": 42
+        },
+        {
+          "name": "Staalstraat_6-1",
+          "num_images": 48
+        },
+        {
+          "name": "Brederodestraat_4-2",
+          "num_images": 52
+        },
+        {
+          "name": "Warmoesstraat_16-F",
+          "num_images": 40
+        },
+        {
+          "name": "Schubertstraat_54",
+          "num_images": 42
+        },
+        {
+          "name": "Weteringstraat_9",
+          "num_images": 44
+        },
+        {
+          "name": "Mijehof_148",
+          "num_images": 49
+        },
+        {
+          "name": "Anne_Kooistrahof_92",
+          "num_images": 43
+        },
+        {
+          "name": "Pieter_Calandlaan_486",
+          "num_images": 41
+        },
+        {
+          "name": "Keizersgracht_133-B",
+          "num_images": 48
+        }
+      ]
+    },
+    "greater_than_60": {
+      "target_count": 3,
+      "actual_count": 3,
+      "properties": [
+        {
+          "name": "Herengracht_106",
+          "num_images": 61
+        },
+        {
+          "name": "Titiaanstraat_29-1",
+          "num_images": 76
+        },
+        {
+          "name": "Egelantiersstraat_109",
+          "num_images": 65
+        }
+      ]
+    }
+  },
+  "summary": {
+    "total_sampled": 35,
+    "total_requested": 35
+  }
+}
